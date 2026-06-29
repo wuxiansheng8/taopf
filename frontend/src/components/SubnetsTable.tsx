@@ -20,11 +20,6 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
 
   const columns = useMemo(
     () => [
-      {
-        id: 'rowIndex',
-        header: '序号',
-        cell: (info: any) => <span className="text-gray-500 font-mono">{info.row.index + 1}</span>
-      },
       columnHelper.accessor('netuid', {
         header: '子网 ID',
         cell: (info) => <span className="font-bold text-white">SN{info.getValue()}</span>
@@ -108,6 +103,9 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="bg-[#0f141f]/80">
+                <th className="p-4 border-b border-white/5 font-semibold text-gray-400 select-none sticky top-0 z-10 bg-[#0f141f]">
+                  序号
+                </th>
                 {headerGroup.headers.map((header) => {
                   const isSortable = header.column.getCanSort();
                   const sortDir = header.column.getIsSorted();
@@ -115,7 +113,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
                     <th
                       key={header.id}
                       onClick={header.column.getToggleSortingHandler()}
-                      className={`p-4 border-b border-white/5 font-semibold text-gray-400 select-none ${
+                      className={`p-4 border-b border-white/5 font-semibold text-gray-400 select-none sticky top-0 z-10 bg-[#0f141f] ${
                         isSortable ? 'cursor-pointer hover:text-white' : ''
                       }`}
                     >
@@ -134,7 +132,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => {
+            {table.getRowModel().rows.map((row, idx) => {
               const subnet = row.original;
               const isInactive = subnet.status === '排放禁用';
               return (
@@ -144,6 +142,9 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
                     isInactive ? 'opacity-50 text-gray-400' : ''
                   }`}
                 >
+                  <td className="p-3 align-middle text-gray-500 font-mono">
+                    {idx + 1}
+                  </td>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="p-3 align-middle">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
