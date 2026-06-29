@@ -1,6 +1,5 @@
 import { ApiPromise } from '@polkadot/api';
 import { SubnetBlockData } from '../../../shared/types.js';
-import { logger } from '../services/logService.js';
 
 function parseFixed32(val: any): number {
   if (!val) return 0;
