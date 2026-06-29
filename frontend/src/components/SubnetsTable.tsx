@@ -28,16 +28,9 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
         header: '排放状态',
         cell: (info) => {
           const val = info.getValue();
-          let color = 'text-gray-400 bg-gray-500/10 border-gray-500/20';
-          if (val === '正常排放') {
-            color = 'text-green-400 bg-green-500/10 border-green-500/20';
-          } else if (val === '已 start_call 但排放禁用') {
-            color = 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-          } else if (val === '未 start_call') {
-            color = 'text-red-400 bg-red-500/10 border-red-500/20';
-          } else if (val === '无权重或注册关闭') {
-            color = 'text-gray-500 bg-gray-500/5 border-gray-500/10';
-          }
+          const color = val === '正常排放'
+            ? 'text-green-400 bg-green-500/10 border-green-500/20'
+            : 'text-red-400 bg-red-500/10 border-red-500/20';
           return (
             <span className={`px-2 py-0.5 text-xs rounded border ${color} font-medium`}>
               {val}
@@ -45,8 +38,18 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           );
         }
       }),
-      columnHelper.accessor('tempo', {
-        header: '周期 (区块)'
+      columnHelper.accessor('emission_share', {
+        header: '排放占比',
+        cell: (info) => {
+          const value = info.getValue();
+          const percent = value * 100;
+          const decimals = percent >= 0.01 ? 2 : 4;
+          return (
+            <span className="font-semibold text-cyan-300">
+              {percent.toFixed(decimals)}%
+            </span>
+          );
+        }
       }),
       columnHelper.accessor('tao_in', {
         header: 'TAO 注入量',
@@ -157,7 +160,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           <tbody>
             {table.getRowModel().rows.map((row, idx) => {
               const subnet = row.original;
-              const isInactive = subnet.status === '已 start_call 但排放禁用' || subnet.status === '未 start_call';
+              const isInactive = subnet.status === '禁止排放';
               return (
                 <tr
                   key={row.id}

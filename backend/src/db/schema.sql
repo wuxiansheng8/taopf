@@ -9,8 +9,7 @@ CREATE TABLE IF NOT EXISTS emissions_history (
     block_number INTEGER,
     netuid INTEGER,
     enabled INTEGER,
-    status TEXT, -- '未 start_call' | '已 start_call 但排放禁用' | '正常排放' | '无权重或注册关闭'
-    tempo INTEGER,
+    status TEXT, -- '正常排放' | '禁止排放'
     owner TEXT,
     tao_in REAL,
     alpha_in REAL,
@@ -23,7 +22,6 @@ CREATE TABLE IF NOT EXISTS emissions_history (
     root_prop REAL DEFAULT 0,
     miner_burned REAL DEFAULT 0,
     moving_price REAL DEFAULT 0,
-    first_emission_block INTEGER DEFAULT 0,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (block_number, netuid)
 );

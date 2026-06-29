@@ -27,6 +27,18 @@ let CURRENT_BLOCK_DATA: BlockEmissionRecord = {
 
 const uptimeStart = Date.now();
 
+function getEmissionValue(subnet: Pick<SubnetBlockData, 'tao_in' | 'excess_tao' | 'total_neuron_em'>): number {
+  return (subnet.tao_in || 0) + (subnet.excess_tao || 0) + (subnet.total_neuron_em || 0);
+}
+
+function withEmissionShares(subnets: SubnetBlockData[]): SubnetBlockData[] {
+  const totalEmission = subnets.reduce((sum, subnet) => sum + getEmissionValue(subnet), 0);
+  return subnets.map((subnet) => ({
+    ...subnet,
+    emission_share: totalEmission > 0 ? getEmissionValue(subnet) / totalEmission : 0
+  }));
+}
+
 // Load sliding window cache from SQLite
 export async function initEmissionsCache(): Promise<void> {
   const db = await getDb();
@@ -76,25 +88,24 @@ export async function initEmissionsCache(): Promise<void> {
     CURRENT_BLOCK_DATA = {
       block_number: latestBNum,
       beijing_time: timeStr,
-      subnets: latestRows.map(row => ({
+      subnets: withEmissionShares(latestRows.map(row => ({
         netuid: row.netuid,
         enabled: row.enabled === 1,
-        status: row.status as any,
-        tempo: row.tempo,
+        status: row.enabled === 1 ? '正常排放' : '禁止排放',
         owner: row.owner,
         tao_in: row.tao_in,
         alpha_in: row.alpha_in,
         alpha_out: row.alpha_out,
         excess_tao: row.excess_tao,
+        emission_share: 0,
         subnet_tao: row.subnet_tao,
         subnet_alpha: row.subnet_alpha || 0,
         alpha_price: row.alpha_price,
         total_neuron_em: row.total_neuron_em,
         root_prop: row.root_prop || 0,
         miner_burned: row.miner_burned || 0,
-        moving_price: row.moving_price || 0,
-        first_emission_block: row.first_emission_block || 0
-      }))
+        moving_price: row.moving_price || 0
+      })))
     };
     logger.info(`已同步初始化最新区块数据为 #${latestBNum} (${CURRENT_BLOCK_DATA.subnets.length} 个子网)`);
     logger.info(`缓存加载完成。范围: #${ROLLING_BUFFER[0].block_number} 至 #${ROLLING_BUFFER[ROLLING_BUFFER.length - 1].block_number}`);
@@ -109,19 +120,20 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
     logger.warn(`检测到重复或旧区块 #${blockNumber}，已跳过数据落盘与累加（当前最新区块: #${CURRENT_BLOCK_DATA.block_number}）`);
     return;
   }
+  const subnetsWithShares = withEmissionShares(subnets);
   const db = await getDb();
   // 1. Insert into database using transactions for reliability
   await db.run('BEGIN TRANSACTION');
   try {
-    for (const sub of subnets) {
+    for (const sub of subnetsWithShares) {
       await db.run(
         `INSERT OR REPLACE INTO emissions_history 
-        (block_number, netuid, enabled, status, tempo, owner, tao_in, alpha_in, alpha_out, excess_tao, subnet_tao, subnet_alpha, alpha_price, total_neuron_em, root_prop, miner_burned, moving_price, first_emission_block, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (block_number, netuid, enabled, status, owner, tao_in, alpha_in, alpha_out, excess_tao, subnet_tao, subnet_alpha, alpha_price, total_neuron_em, root_prop, miner_burned, moving_price, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          blockNumber, sub.netuid, sub.enabled ? 1 : 0, sub.status, sub.tempo, sub.owner,
+          blockNumber, sub.netuid, sub.enabled ? 1 : 0, sub.status, sub.owner,
           sub.tao_in, sub.alpha_in, sub.alpha_out, sub.excess_tao, sub.subnet_tao, sub.subnet_alpha, sub.alpha_price, sub.total_neuron_em,
-          sub.root_prop, sub.miner_burned, sub.moving_price, sub.first_emission_block, beijingTime
+          sub.root_prop, sub.miner_burned, sub.moving_price, beijingTime
         ]
       );
     }
@@ -134,7 +146,7 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
 
   // Update in-memory ROLLING_BUFFER & RUNNING_SUM
   const blockMemoryData: { [netuid: number]: any } = {};
-  for (const sub of subnets) {
+  for (const sub of subnetsWithShares) {
     blockMemoryData[sub.netuid] = {
       tao_in: sub.tao_in,
       alpha_in: sub.alpha_in,
@@ -171,7 +183,7 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
     }
   }
 
-  CURRENT_BLOCK_DATA = { block_number: blockNumber, beijing_time: beijingTime, subnets };
+  CURRENT_BLOCK_DATA = { block_number: blockNumber, beijing_time: beijingTime, subnets: subnetsWithShares };
 
   try {
     const oldestBlock = blockNumber - ROLLING_LIMIT;
@@ -185,7 +197,7 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
     block_number: blockNumber,
     beijing_time: beijingTime,
     uptime: Math.floor((Date.now() - uptimeStart) / 1000),
-    subnets: subnets
+    subnets: subnetsWithShares
   });
 }
 
@@ -204,21 +216,20 @@ export function get24hAggregatedEmissions(): SubnetBlockData[] {
       netuid,
       enabled: currentSub.enabled,
       status: currentSub.status,
-      tempo: currentSub.tempo,
       owner: currentSub.owner,
       tao_in: sums.tao_in,
       alpha_in: sums.alpha_in,
       alpha_out: sums.alpha_out,
       excess_tao: sums.excess_tao,
+      emission_share: 0,
       subnet_tao: currentSub.subnet_tao,
       subnet_alpha: currentSub.subnet_alpha,
       alpha_price: currentSub.alpha_price,
       total_neuron_em: sums.total_neuron_em,
       root_prop: currentSub.root_prop,
       miner_burned: currentSub.miner_burned,
-      moving_price: currentSub.moving_price,
-      first_emission_block: currentSub.first_emission_block
+      moving_price: currentSub.moving_price
     });
   }
-  return output;
+  return withEmissionShares(output);
 }

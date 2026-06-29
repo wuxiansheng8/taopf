@@ -16,7 +16,6 @@ export async function querySubnetEmissionsAtHash(
 
   // Query all maps concurrently
   const [
-    tempoEntries,
     enabledEntries,
     ownerHotkeyEntries,
     taoInEntries,
@@ -28,12 +27,10 @@ export async function querySubnetEmissionsAtHash(
     rootPropEntries,
     minerBurnedEntries,
     movingPriceEntries,
-    firstEmBlockEntries,
     ownerCutEnabledEntries,
     globalOwnerCut,
     rawPrices
   ] = await Promise.all([
-    apiAt.query.subtensorModule.tempo.entries(),
     apiAt.query.subtensorModule.subnetEmissionEnabled.entries(),
     apiAt.query.subtensorModule.subnetOwnerHotkey.entries(),
     apiAt.query.subtensorModule.subnetTaoInEmission.entries(),
@@ -45,18 +42,12 @@ export async function querySubnetEmissionsAtHash(
     apiAt.query.subtensorModule.rootProp.entries(),
     apiAt.query.subtensorModule.minerBurned.entries(),
     apiAt.query.subtensorModule.subnetMovingPrice.entries(),
-    apiAt.query.subtensorModule.firstEmissionBlockNumber.entries(),
     apiAt.query.subtensorModule.ownerCutEnabled.entries(),
     apiAt.query.subtensorModule.subnetOwnerCut(),
     apiAt.call.swapRuntimeApi.currentAlphaPriceAll()
   ]);
 
   // Convert entries to simple lookup Maps: netuid -> value
-  const tempoMap = new Map<number, number>();
-  for (const [key, val] of tempoEntries) {
-    tempoMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
   const enabledMap = new Map<number, boolean>();
   for (const [key, val] of enabledEntries) {
     enabledMap.set(Number(key.args[0].toString()), val.toJSON() === true);
@@ -112,11 +103,6 @@ export async function querySubnetEmissionsAtHash(
     movingPriceMap.set(Number(key.args[0].toString()), parseFixed32(val));
   }
 
-  const firstEmBlockMap = new Map<number, number>();
-  for (const [key, val] of firstEmBlockEntries) {
-    firstEmBlockMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
   const ownerCutEnabledMap = new Map<number, boolean>();
   for (const [key, val] of ownerCutEnabledEntries) {
     ownerCutEnabledMap.set(Number(key.args[0].toString()), val.toJSON() === true);
@@ -137,14 +123,12 @@ export async function querySubnetEmissionsAtHash(
   // Generate list for subnets 1 to 128
   for (let netuid = 1; netuid <= 128; netuid++) {
     // Check if the subnet exists/active
-    if (!ownerMap.has(netuid) && (tempoMap.get(netuid) || 0) === 0) {
+    if (!ownerMap.has(netuid)) {
       continue;
     }
 
     const enabled = enabledMap.get(netuid) ?? true;
-    const tempo = tempoMap.get(netuid) ?? 0;
     const owner = ownerMap.get(netuid) ?? 'Unknown';
-    const first_emission_block = firstEmBlockMap.get(netuid) ?? 0;
 
     // Convert from Rao (9 decimals) to TAO
     const rawTaoIn = taoInMap.get(netuid) ?? 0;
@@ -171,36 +155,25 @@ export async function querySubnetEmissionsAtHash(
     const neuron_alpha = after_owner * (1 - root_prop * 0.5);
     const total_neuron_em = neuron_alpha * alpha_price;
 
-    // Classify Subnet Emission Status (Four-state)
-    let status: SubnetBlockData['status'] = '正常排放';
-    if (first_emission_block === 0) {
-      status = '未 start_call';
-    } else if (!enabled) {
-      status = '已 start_call 但排放禁用';
-    } else if (tao_in + excess_tao === 0) {
-      status = '无权重或注册关闭';
-    } else {
-      status = '正常排放';
-    }
+    const status: SubnetBlockData['status'] = enabled ? '正常排放' : '禁止排放';
 
     subnetsData.push({
       netuid,
       enabled,
       status,
-      tempo,
       owner,
       tao_in,
       alpha_in,
       alpha_out,
       excess_tao,
+      emission_share: 0,
       subnet_tao,
       subnet_alpha: alphaReserve / 1e9,
       alpha_price,
       total_neuron_em,
       root_prop,
       miner_burned,
-      moving_price,
-      first_emission_block
+      moving_price
     });
   }
 
