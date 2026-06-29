@@ -200,6 +200,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-6 text-xs text-accentBlue font-semibold">
+                  <span>总排放: {(totals.inflow + totals.buyback).toFixed(4)} TAO</span>
                   <span>总流入: {totals.inflow.toFixed(4)} TAO</span>
                   <span>总回购: {totals.buyback.toFixed(4)} TAO</span>
                 </div>

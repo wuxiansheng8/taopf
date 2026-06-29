@@ -139,7 +139,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="bg-[#0f141f]/80">
-                <th className="p-4 border-b border-white/5 font-semibold text-gray-400 select-none sticky top-0 z-10 bg-[#0f141f]">
+                <th className="px-4 py-3 border-b border-white/5 font-semibold text-gray-400 select-none sticky top-0 z-10 bg-[#0f141f] text-left">
                   序号
                 </th>
                 {headerGroup.headers.map((header) => {
@@ -149,11 +149,11 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
                     <th
                       key={header.id}
                       onClick={header.column.getToggleSortingHandler()}
-                      className={`p-4 border-b border-white/5 font-semibold text-gray-400 select-none sticky top-0 z-10 bg-[#0f141f] ${
+                      className={`px-4 py-3 border-b border-white/5 font-semibold text-gray-400 select-none sticky top-0 z-10 bg-[#0f141f] text-left ${
                         isSortable ? 'cursor-pointer hover:text-white' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-start gap-1">
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {isSortable && (
                           <span className="text-[10px] opacity-60">
@@ -178,11 +178,11 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
                     isInactive ? 'opacity-50 text-gray-400' : ''
                   }`}
                 >
-                  <td className="p-3 align-middle text-gray-500 font-mono">
+                  <td className="px-4 py-3 align-middle text-gray-500 font-mono text-left">
                     {idx + 1}
                   </td>
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="p-3 align-middle">
+                    <td key={cell.id} className="px-4 py-3 align-middle text-left">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -193,13 +193,13 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           <tfoot>
             <tr>
               {/* 1. 硬编码序号列 - 留空 */}
-              <td className="sticky bottom-0 bg-[#0f141f]/95 backdrop-blur-md border-t border-white/10 p-3 align-middle text-gray-500 font-mono z-20"></td>
+              <td className="sticky bottom-0 bg-[#0f141f]/95 backdrop-blur-md border-t border-white/10 px-4 py-3 align-middle text-gray-500 font-mono z-20 text-left"></td>
               
               {/* 2. TanStack Table 动态单元格 */}
               {table.getVisibleFlatColumns().map((column) => {
                 const colId = column.id;
                 let content: ReactNode = null;
-                let className = "sticky bottom-0 bg-[#0f141f]/95 backdrop-blur-md border-t border-white/10 p-3 align-middle z-20";
+                let className = "sticky bottom-0 bg-[#0f141f]/95 backdrop-blur-md border-t border-white/10 px-4 py-3 align-middle z-20 text-left";
 
                 if (colId === 'netuid') {
                   content = "合计";
