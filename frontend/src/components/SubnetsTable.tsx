@@ -20,9 +20,14 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
 
   const columns = useMemo(
     () => [
+      {
+        id: 'rowIndex',
+        header: '序号',
+        cell: (info: any) => <span className="text-gray-500 font-mono">{info.row.index + 1}</span>
+      },
       columnHelper.accessor('netuid', {
         header: '子网 ID',
-        cell: (info) => <span className="font-bold text-white">{info.getValue()}</span>
+        cell: (info) => <span className="font-bold text-white">SN{info.getValue()}</span>
       }),
       columnHelper.accessor('status', {
         header: '排放状态',
@@ -34,7 +39,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           } else if (val === '排放开关正常') {
             color = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
           } else if (val === '排放禁用') {
-            color = 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+            color = 'text-red-400 bg-red-500/10 border-red-500/20';
           }
           return (
             <span className={`px-2 py-0.5 text-xs rounded border ${color} font-medium`}>
@@ -97,8 +102,8 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
   });
 
   return (
-    <div className="glass-card overflow-hidden shadow-xl">
-      <div className="overflow-x-auto">
+    <div className="glass-card overflow-hidden shadow-xl h-full flex flex-col">
+      <div className="overflow-x-auto overflow-y-auto flex-grow">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
