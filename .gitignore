@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+dist/
+
+# SQLite Database
+taopf.db
+taopf.db-wal
+taopf.db-shm
+taopf.db.bak
+
+# Local Environment
+.env
+.env.local
+
+# Frontend Build
+frontend/dist/
+frontend/node_modules/
+
+# OS Logs/Temp
+.DS_Store
+*.log
+/tmp/

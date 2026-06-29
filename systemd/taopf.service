@@ -1,0 +1,16 @@
+[Unit]
+Description=TAOPF Subnet Emissions Monitoring Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={{PROJECT_DIR}}/backend
+ExecStart=/usr/bin/node dist/app.js
+Restart=always
+RestartSec=5s
+Environment=PORT={{PORT}}
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
