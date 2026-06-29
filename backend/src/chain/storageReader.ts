@@ -21,7 +21,10 @@ export async function querySubnetEmissionsAtHash(
     excessTaoEntries,
     subnetTaoEntries,
     subnetAlphaInEntries,
-    emissionEntries
+    emissionEntries,
+    pendingServerEntries,
+    pendingValidatorEntries,
+    blocksSinceLastStepEntries
   ] = await Promise.all([
     apiAt.query.subtensorModule.tempo.entries(),
     apiAt.query.subtensorModule.subnetEmissionEnabled.entries(),
@@ -32,7 +35,10 @@ export async function querySubnetEmissionsAtHash(
     apiAt.query.subtensorModule.subnetExcessTao.entries(),
     apiAt.query.subtensorModule.subnetTAO.entries(),
     apiAt.query.subtensorModule.subnetAlphaIn.entries(),
-    apiAt.query.subtensorModule.emission.entries()
+    apiAt.query.subtensorModule.emission.entries(),
+    apiAt.query.subtensorModule.pendingServerEmission.entries(),
+    apiAt.query.subtensorModule.pendingValidatorEmission.entries(),
+    apiAt.query.subtensorModule.blocksSinceLastStep.entries()
   ]);
 
   // Convert entries to simple lookup Maps: netuid -> value
@@ -81,6 +87,21 @@ export async function querySubnetEmissionsAtHash(
     subnetAlphaInMap.set(Number(key.args[0].toString()), Number(val.toString()));
   }
 
+  const pendingServerMap = new Map<number, number>();
+  for (const [key, val] of pendingServerEntries) {
+    pendingServerMap.set(Number(key.args[0].toString()), Number(val.toString()));
+  }
+
+  const pendingValidatorMap = new Map<number, number>();
+  for (const [key, val] of pendingValidatorEntries) {
+    pendingValidatorMap.set(Number(key.args[0].toString()), Number(val.toString()));
+  }
+
+  const blocksSinceLastStepMap = new Map<number, number>();
+  for (const [key, val] of blocksSinceLastStepEntries) {
+    blocksSinceLastStepMap.set(Number(key.args[0].toString()), Number(val.toString()));
+  }
+
   const emissionMap = new Map<number, number>();
   for (const [key, val] of emissionEntries) {
     const list = val.toJSON() as number[];
@@ -112,7 +133,6 @@ export async function querySubnetEmissionsAtHash(
     const tao_in = enabled ? rawTaoIn / 1e9 : 0;
     const excess_tao = enabled ? rawExcessTao / 1e9 : 0;
     const subnet_tao = rawSubnetTao / 1e9;
-    const total_neuron_em = rawTotalNeuronEm / 1e9;
 
     const alpha_in = enabled ? (alphaInMap.get(netuid) ?? 0) / 1e9 : 0;
     const alpha_out = (alphaOutMap.get(netuid) ?? 0) / 1e9;
@@ -120,6 +140,15 @@ export async function querySubnetEmissionsAtHash(
     // Spot Price = SubnetTAO / SubnetAlphaIn
     const alphaReserve = subnetAlphaInMap.get(netuid) ?? 0;
     const alpha_price = alphaReserve > 0 ? rawSubnetTao / alphaReserve : 0.0;
+
+    // High precision real-time neuron emission rate calculation in TAO per block
+    const pendingServer = pendingServerMap.get(netuid) ?? 0;
+    const pendingValidator = pendingValidatorMap.get(netuid) ?? 0;
+    const blocksSinceLastStep = blocksSinceLastStepMap.get(netuid) ?? 0;
+    const totalPending = pendingServer + pendingValidator;
+    const alphaEmRate = blocksSinceLastStep > 0 ? (totalPending / blocksSinceLastStep) : 0;
+    const fallbackVal = tempo > 0 ? ((rawTotalNeuronEm / 1e9 / tempo) * alpha_price) : 0;
+    const total_neuron_em = blocksSinceLastStep > 0 ? ((alphaEmRate / 1e9) * alpha_price) : fallbackVal;
 
     // Classify Subnet Emission Status (Three-state)
     let status: SubnetBlockData['status'] = '排放开关正常';
