@@ -14,6 +14,38 @@ fi
 PROJECT_DIR=$(cd "$(dirname "$0")" && pwd)
 DB_PATH="$PROJECT_DIR/taopf.db"
 DB_BACKUP_PATH="$PROJECT_DIR/taopf.db.bak"
+SERVICE_FILE="/etc/systemd/system/taopf.service"
+
+get_service_port() {
+  local current_port
+  current_port=$(systemctl show taopf.service -p Environment --value 2>/dev/null | tr ' ' '\n' | sed -n 's/^PORT=//p' | head -n 1)
+  if [ -z "$current_port" ] && [ -f "$SERVICE_FILE" ]; then
+    current_port=$(sed -n 's/^Environment=PORT=//p' "$SERVICE_FILE" | head -n 1)
+  fi
+  echo "${current_port:-8000}"
+}
+
+ensure_service_workdir() {
+  local expected_workdir="$PROJECT_DIR/backend"
+  local current_workdir
+  local service_port
+
+  current_workdir=$(systemctl show taopf.service -p WorkingDirectory --value 2>/dev/null || true)
+  if [ "$current_workdir" = "$expected_workdir" ]; then
+    return
+  fi
+
+  service_port=$(get_service_port)
+  echo "⚠️ 检测到 systemd 服务目录不一致，正在自动修正..."
+  echo "   当前目录: ${current_workdir:-未设置}"
+  echo "   正确目录: $expected_workdir"
+
+  cp "$PROJECT_DIR/systemd/taopf.service" "$SERVICE_FILE"
+  sed -i "s|{{PROJECT_DIR}}|$PROJECT_DIR|g" "$SERVICE_FILE"
+  sed -i "s|{{PORT}}|$service_port|g" "$SERVICE_FILE"
+  systemctl daemon-reload
+  echo "✅ systemd 服务目录已修正，端口保持为 $service_port"
+}
 
 # 0. Setup failure recovery trap
 cleanup_on_error() {
@@ -102,6 +134,9 @@ if [ -f "$DB_BACKUP_PATH" ] && [ ! -f "$DB_PATH" ]; then
   echo "🔄 正在恢复本地数据库..."
   cp "$DB_BACKUP_PATH" "$DB_PATH"
 fi
+
+# 4.5 Ensure systemd points to this project directory
+ensure_service_workdir
 
 # 5. Rebuild Backend
 echo "🔄 正在更新并重新编译后端依赖..."
