@@ -29,12 +29,14 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
         cell: (info) => {
           const val = info.getValue();
           let color = 'text-gray-400 bg-gray-500/10 border-gray-500/20';
-          if (val === '本块有注入') {
+          if (val === '正常排放') {
             color = 'text-green-400 bg-green-500/10 border-green-500/20';
-          } else if (val === '排放开关正常') {
-            color = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-          } else if (val === '排放禁用') {
+          } else if (val === '已 start_call 但排放禁用') {
+            color = 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+          } else if (val === '未 start_call') {
             color = 'text-red-400 bg-red-500/10 border-red-500/20';
+          } else if (val === '无权重或注册关闭') {
+            color = 'text-gray-500 bg-gray-500/5 border-gray-500/10';
           }
           return (
             <span className={`px-2 py-0.5 text-xs rounded border ${color} font-medium`}>
@@ -61,6 +63,27 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
       columnHelper.accessor('alpha_price', {
         header: 'Alpha 价格',
         cell: (info) => <span className="text-blue-400 font-semibold">{info.getValue().toFixed(6)}</span>
+      }),
+      columnHelper.accessor('moving_price', {
+        header: 'EMA 价格',
+        cell: (info) => <span className="text-purple-400 font-semibold">{info.getValue().toFixed(6)}</span>
+      }),
+      columnHelper.accessor('root_prop', {
+        header: '根比例',
+        cell: (info) => <span className="text-orange-400 font-semibold">{(info.getValue() * 100).toFixed(2)}%</span>
+      }),
+      columnHelper.accessor('miner_burned', {
+        header: '矿工燃烧率',
+        cell: (info) => {
+          const val = info.getValue();
+          const percent = (val * 100).toFixed(2);
+          const isHigh = val > 0;
+          return (
+            <span className={`font-semibold ${isHigh ? 'text-red-400 font-bold' : 'text-gray-400'}`}>
+              {percent}%
+            </span>
+          );
+        }
       }),
       columnHelper.accessor('subnet_tao', {
         header: '池子 TAO 储备',
@@ -93,7 +116,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    enableSortingRemoval: true // Enables third click to clear sorting
+    enableSortingRemoval: true
   });
 
   return (
@@ -134,7 +157,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           <tbody>
             {table.getRowModel().rows.map((row, idx) => {
               const subnet = row.original;
-              const isInactive = subnet.status === '排放禁用';
+              const isInactive = subnet.status === '已 start_call 但排放禁用' || subnet.status === '未 start_call';
               return (
                 <tr
                   key={row.id}

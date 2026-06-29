@@ -1,7 +1,7 @@
 export interface SubnetBlockData {
   netuid: number;
   enabled: boolean;
-  status: '排放禁用' | '排放开关正常' | '本块有注入';
+  status: '未 start_call' | '已 start_call 但排放禁用' | '正常排放' | '无权重或注册关闭';
   tempo: number;
   owner: string;
   tao_in: number;
@@ -12,6 +12,10 @@ export interface SubnetBlockData {
   subnet_alpha: number;
   alpha_price: number;
   total_neuron_em: number;
+  root_prop: number;
+  miner_burned: number;
+  moving_price: number;
+  first_emission_block: number;
 }
 
 export interface BlockEmissionRecord {

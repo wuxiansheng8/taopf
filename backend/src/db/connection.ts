@@ -26,12 +26,20 @@ export async function getDb(): Promise<Database> {
   // Initialize Schema directly from embedded SQL string
   await dbInstance.exec(SCHEMA_SQL);
   
-  // Migration: Try to append subnet_alpha column to older emissions_history tables
-  try {
-    await dbInstance.exec("ALTER TABLE emissions_history ADD COLUMN subnet_alpha REAL DEFAULT 0;");
-  } catch (err: any) {
-    if (!err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
-      throw err;
+  // Migration: Try to append subnet_alpha and Spec 421/423 columns to older emissions_history tables
+  for (const col of [
+    'subnet_alpha REAL DEFAULT 0',
+    'root_prop REAL DEFAULT 0',
+    'miner_burned REAL DEFAULT 0',
+    'moving_price REAL DEFAULT 0',
+    'first_emission_block INTEGER DEFAULT 0'
+  ]) {
+    try {
+      await dbInstance.exec(`ALTER TABLE emissions_history ADD COLUMN ${col};`);
+    } catch (err: any) {
+      if (!err.message.includes('duplicate column name') && !err.message.includes('already exists')) {
+        throw err;
+      }
     }
   }
   

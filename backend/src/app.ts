@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 
 // Import local services
 import { getDb } from './db/connection.js';
-import { initEmissionCache } from './services/emissionService.js';
+import { initEmissionsCache } from './services/emissionService.js';
 import { startLogPruner, logger } from './services/logService.js';
 import { startChainListener } from './chain/listener.js';
 
@@ -55,7 +55,7 @@ const start = async () => {
     startLogPruner();
     
     // 3. Populate memory emissions cache
-    await initEmissionCache();
+    await initEmissionsCache();
     
     // 4. Start blockchain subscriber
     startChainListener().catch(err => {
