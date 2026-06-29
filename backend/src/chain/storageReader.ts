@@ -17,7 +17,6 @@ export async function querySubnetEmissionsAtHash(
   // Query all maps concurrently
   const [
     enabledEntries,
-    ownerHotkeyEntries,
     taoInEntries,
     alphaInEntries,
     alphaOutEntries,
@@ -32,7 +31,6 @@ export async function querySubnetEmissionsAtHash(
     rawPrices
   ] = await Promise.all([
     apiAt.query.subtensorModule.subnetEmissionEnabled.entries(),
-    apiAt.query.subtensorModule.subnetOwnerHotkey.entries(),
     apiAt.query.subtensorModule.subnetTaoInEmission.entries(),
     apiAt.query.subtensorModule.subnetAlphaInEmission.entries(),
     apiAt.query.subtensorModule.subnetAlphaOutEmission.entries(),
@@ -53,10 +51,7 @@ export async function querySubnetEmissionsAtHash(
     enabledMap.set(Number(key.args[0].toString()), val.toJSON() === true);
   }
 
-  const ownerMap = new Map<number, string>();
-  for (const [key, val] of ownerHotkeyEntries) {
-    ownerMap.set(Number(key.args[0].toString()), val.toString());
-  }
+
 
   const taoInMap = new Map<number, number>();
   for (const [key, val] of taoInEntries) {
@@ -122,13 +117,7 @@ export async function querySubnetEmissionsAtHash(
 
   // Generate list for subnets 1 to 128
   for (let netuid = 1; netuid <= 128; netuid++) {
-    // Check if the subnet exists/active
-    if (!ownerMap.has(netuid)) {
-      continue;
-    }
-
     const enabled = enabledMap.get(netuid) ?? true;
-    const owner = ownerMap.get(netuid) ?? 'Unknown';
 
     // Convert from Rao (9 decimals) to TAO
     const rawTaoIn = taoInMap.get(netuid) ?? 0;
@@ -161,7 +150,6 @@ export async function querySubnetEmissionsAtHash(
       netuid,
       enabled,
       status,
-      owner,
       tao_in,
       alpha_in,
       alpha_out,

@@ -27,8 +27,8 @@ let CURRENT_BLOCK_DATA: BlockEmissionRecord = {
 
 const uptimeStart = Date.now();
 
-function getEmissionValue(subnet: Pick<SubnetBlockData, 'tao_in' | 'excess_tao' | 'total_neuron_em'>): number {
-  return (subnet.tao_in || 0) + (subnet.excess_tao || 0) + (subnet.total_neuron_em || 0);
+function getEmissionValue(subnet: Pick<SubnetBlockData, 'tao_in' | 'excess_tao'>): number {
+  return (subnet.tao_in || 0) + (subnet.excess_tao || 0);
 }
 
 function withEmissionShares(subnets: SubnetBlockData[]): SubnetBlockData[] {
@@ -92,7 +92,6 @@ export async function initEmissionsCache(): Promise<void> {
         netuid: row.netuid,
         enabled: row.enabled === 1,
         status: row.enabled === 1 ? '正常排放' : '禁止排放',
-        owner: row.owner,
         tao_in: row.tao_in,
         alpha_in: row.alpha_in,
         alpha_out: row.alpha_out,
@@ -128,10 +127,10 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
     for (const sub of subnetsWithShares) {
       await db.run(
         `INSERT OR REPLACE INTO emissions_history 
-        (block_number, netuid, enabled, status, owner, tao_in, alpha_in, alpha_out, excess_tao, subnet_tao, subnet_alpha, alpha_price, total_neuron_em, root_prop, miner_burned, moving_price, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (block_number, netuid, enabled, status, tao_in, alpha_in, alpha_out, excess_tao, subnet_tao, subnet_alpha, alpha_price, total_neuron_em, root_prop, miner_burned, moving_price, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          blockNumber, sub.netuid, sub.enabled ? 1 : 0, sub.status, sub.owner,
+          blockNumber, sub.netuid, sub.enabled ? 1 : 0, sub.status,
           sub.tao_in, sub.alpha_in, sub.alpha_out, sub.excess_tao, sub.subnet_tao, sub.subnet_alpha, sub.alpha_price, sub.total_neuron_em,
           sub.root_prop, sub.miner_burned, sub.moving_price, beijingTime
         ]
@@ -216,7 +215,6 @@ export function get24hAggregatedEmissions(): SubnetBlockData[] {
       netuid,
       enabled: currentSub.enabled,
       status: currentSub.status,
-      owner: currentSub.owner,
       tao_in: sums.tao_in,
       alpha_in: sums.alpha_in,
       alpha_out: sums.alpha_out,

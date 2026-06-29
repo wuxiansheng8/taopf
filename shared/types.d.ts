@@ -2,7 +2,6 @@ export interface SubnetBlockData {
   netuid: number;
   enabled: boolean;
   status: '正常排放' | '禁止排放';
-  owner: string;
   tao_in: number;
   alpha_in: number;
   alpha_out: number;

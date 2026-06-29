@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS emissions_history (
     netuid INTEGER,
     enabled INTEGER,
     status TEXT, -- '正常排放' | '禁止排放'
-    owner TEXT,
     tao_in REAL,
     alpha_in REAL,
     alpha_out REAL,

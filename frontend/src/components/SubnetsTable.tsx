@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -99,14 +99,6 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
       columnHelper.accessor('total_neuron_em', {
         header: '神经元排放',
         cell: (info) => <span className="font-semibold text-white">{info.getValue().toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
-      }),
-      columnHelper.accessor('owner', {
-        header: '所有者 Hotkey',
-        cell: (info) => (
-          <span className="font-mono text-[10px] text-gray-400 block max-w-[120px] truncate" title={info.getValue()}>
-            {info.getValue()}
-          </span>
-        )
       })
     ],
     []
@@ -121,6 +113,24 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
     getSortedRowModel: getSortedRowModel(),
     enableSortingRemoval: true
   });
+
+  const { totalShare, totalTaoIn, totalAlphaIn, totalExcessTao, totalNeuronEm } = useMemo(() => {
+    let tShare = 0, tTaoIn = 0, tAlphaIn = 0, tExcess = 0, tNeuron = 0;
+    for (const item of data) {
+      tShare += item.emission_share || 0;
+      tTaoIn += item.tao_in || 0;
+      tAlphaIn += item.alpha_in || 0;
+      tExcess += item.excess_tao || 0;
+      tNeuron += item.total_neuron_em || 0;
+    }
+    return {
+      totalShare: tShare,
+      totalTaoIn: tTaoIn,
+      totalAlphaIn: tAlphaIn,
+      totalExcessTao: tExcess,
+      totalNeuronEm: tNeuron
+    };
+  }, [data]);
 
   return (
     <div className="glass-card overflow-hidden shadow-xl h-full flex flex-col">
@@ -180,6 +190,45 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
               );
             })}
           </tbody>
+          <tfoot>
+            <tr>
+              {/* 1. 硬编码序号列 - 留空 */}
+              <td className="sticky bottom-0 bg-[#0f141f]/95 backdrop-blur-md border-t border-white/10 p-3 align-middle text-gray-500 font-mono z-20"></td>
+              
+              {/* 2. TanStack Table 动态单元格 */}
+              {table.getVisibleFlatColumns().map((column) => {
+                const colId = column.id;
+                let content: ReactNode = null;
+                let className = "sticky bottom-0 bg-[#0f141f]/95 backdrop-blur-md border-t border-white/10 p-3 align-middle z-20";
+
+                if (colId === 'netuid') {
+                  content = "合计";
+                  className += " font-bold text-white";
+                } else if (colId === 'emission_share') {
+                  content = `${(totalShare * 100).toFixed(2)}%`;
+                  className += " text-cyan-300 font-semibold";
+                } else if (colId === 'tao_in') {
+                  content = totalTaoIn.toFixed(4);
+                  className += " font-semibold text-white";
+                } else if (colId === 'alpha_in') {
+                  content = totalAlphaIn.toFixed(4);
+                  className += " font-semibold text-white";
+                } else if (colId === 'excess_tao') {
+                  content = totalExcessTao.toFixed(4);
+                  className += " font-semibold text-white";
+                } else if (colId === 'total_neuron_em') {
+                  content = totalNeuronEm.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+                  className += " font-semibold text-white";
+                }
+
+                return (
+                  <td key={column.id} className={className}>
+                    {content}
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
