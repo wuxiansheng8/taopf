@@ -1,5 +1,5 @@
 import { getApi } from './api.js';
-import { querySubnetEmissionsAtHash } from './storageReader.js';
+import { queryBlockEmissionSnapshot } from './storageReader.js';
 import { parseBlockEvents } from './eventParser.js';
 import { addBlockEmissions } from '../services/emissionService.js';
 import { logger } from '../services/logService.js';
@@ -29,10 +29,8 @@ export async function startChainListener(): Promise<void> {
           processingQueue = processingQueue.then(async () => {
             try {
               const apiAt = await api.at(blockHash);
-              const events = await apiAt.query.system.events();
+              const { events, subnetsData } = await queryBlockEmissionSnapshot(apiAt);
               parseBlockEvents(events as any, blockNumber);
-              
-              const subnetsData = await querySubnetEmissionsAtHash(api, blockHash);
               
               const now = new Date();
               const utc = now.getTime() + (now.getTimezoneOffset() * 60000);

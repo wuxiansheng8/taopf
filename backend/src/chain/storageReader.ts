@@ -1,169 +1,106 @@
-import { ApiPromise } from '@polkadot/api';
+import { ApiDecoration } from '@polkadot/api/types';
 import { SubnetBlockData } from '../../../shared/types.js';
+import { codecToBoolean, codecToNumber, fixed32ToNumber, RAO_PER_TAO } from './chainValueParser.js';
 
-function parseFixed32(val: any): number {
-  if (!val) return 0;
-  const bits = val.bits ? Number(val.bits.toString()) : Number(val.toString());
-  return bits / 4294967296; // bits / 2^32
+const NETUIDS = Array.from({ length: 128 }, (_, i) => i + 1);
+
+interface DynamicInfoJson {
+  netuid: number;
+  taoInEmission?: unknown;
+  alphaInEmission?: unknown;
+  alphaOutEmission?: unknown;
+  taoIn?: unknown;
+  alphaIn?: unknown;
+  movingPrice?: unknown;
 }
 
-export async function querySubnetEmissionsAtHash(
-  api: ApiPromise,
-  blockHash: string
-): Promise<SubnetBlockData[]> {
-  // Get API decorated at the specific block hash
-  const apiAt = await api.at(blockHash);
-
-  // Query all maps concurrently
-  const [
-    enabledEntries,
-    taoInEntries,
-    alphaInEntries,
-    alphaOutEntries,
-    excessTaoEntries,
-    subnetTaoEntries,
-    subnetAlphaInEntries,
-    rootPropEntries,
-    minerBurnedEntries,
-    movingPriceEntries,
-    ownerCutEnabledEntries,
-    globalOwnerCut,
-    rawPrices
-  ] = await Promise.all([
-    apiAt.query.subtensorModule.subnetEmissionEnabled.entries(),
-    apiAt.query.subtensorModule.subnetTaoInEmission.entries(),
-    apiAt.query.subtensorModule.subnetAlphaInEmission.entries(),
-    apiAt.query.subtensorModule.subnetAlphaOutEmission.entries(),
-    apiAt.query.subtensorModule.subnetExcessTao.entries(),
-    apiAt.query.subtensorModule.subnetTAO.entries(),
-    apiAt.query.subtensorModule.subnetAlphaIn.entries(),
-    apiAt.query.subtensorModule.rootProp.entries(),
-    apiAt.query.subtensorModule.minerBurned.entries(),
-    apiAt.query.subtensorModule.subnetMovingPrice.entries(),
-    apiAt.query.subtensorModule.ownerCutEnabled.entries(),
-    apiAt.query.subtensorModule.subnetOwnerCut(),
-    apiAt.call.swapRuntimeApi.currentAlphaPriceAll()
-  ]);
-
-  // Convert entries to simple lookup Maps: netuid -> value
-  const enabledMap = new Map<number, boolean>();
-  for (const [key, val] of enabledEntries) {
-    enabledMap.set(Number(key.args[0].toString()), val.toJSON() === true);
-  }
-
-
-
-  const taoInMap = new Map<number, number>();
-  for (const [key, val] of taoInEntries) {
-    taoInMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
-  const alphaInMap = new Map<number, number>();
-  for (const [key, val] of alphaInEntries) {
-    alphaInMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
-  const alphaOutMap = new Map<number, number>();
-  for (const [key, val] of alphaOutEntries) {
-    alphaOutMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
-  const excessTaoMap = new Map<number, number>();
-  for (const [key, val] of excessTaoEntries) {
-    excessTaoMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
-  const subnetTaoMap = new Map<number, number>();
-  for (const [key, val] of subnetTaoEntries) {
-    subnetTaoMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
-  const subnetAlphaInMap = new Map<number, number>();
-  for (const [key, val] of subnetAlphaInEntries) {
-    subnetAlphaInMap.set(Number(key.args[0].toString()), Number(val.toString()));
-  }
-
-  const rootPropMap = new Map<number, number>();
-  for (const [key, val] of rootPropEntries) {
-    rootPropMap.set(Number(key.args[0].toString()), parseFixed32(val));
-  }
-
-  const minerBurnedMap = new Map<number, number>();
-  for (const [key, val] of minerBurnedEntries) {
-    minerBurnedMap.set(Number(key.args[0].toString()), parseFixed32(val));
-  }
-
-  const movingPriceMap = new Map<number, number>();
-  for (const [key, val] of movingPriceEntries) {
-    movingPriceMap.set(Number(key.args[0].toString()), parseFixed32(val));
-  }
-
-  const ownerCutEnabledMap = new Map<number, boolean>();
-  for (const [key, val] of ownerCutEnabledEntries) {
-    ownerCutEnabledMap.set(Number(key.args[0].toString()), val.toJSON() === true);
-  }
-
-  const baseOwnerCut = Number(globalOwnerCut.toString()) / 65535;
-
+function buildPriceMap(rawPrices: any): Map<number, number> {
   const priceMap = new Map<number, number>();
-  const pricesList = rawPrices.toJSON() as { netuid: number; price: number }[];
-  if (pricesList) {
-    for (const item of pricesList) {
-      priceMap.set(Number(item.netuid), Number(item.price) / 1e9);
+  const pricesList = rawPrices.toJSON() as { netuid: number; price: unknown }[] | null;
+
+  if (!pricesList) return priceMap;
+
+  for (const item of pricesList) {
+    priceMap.set(Number(item.netuid), codecToNumber(item.price) / RAO_PER_TAO);
+  }
+
+  return priceMap;
+}
+
+function buildDynamicInfoMap(rawDynamicInfo: any): Map<number, DynamicInfoJson> {
+  const dynamicMap = new Map<number, DynamicInfoJson>();
+  const dynamicList = rawDynamicInfo.toJSON() as Array<DynamicInfoJson | null> | null;
+
+  if (!dynamicList) return dynamicMap;
+
+  for (const item of dynamicList) {
+    if (item) {
+      dynamicMap.set(Number(item.netuid), item);
     }
   }
 
-  const subnetsData: SubnetBlockData[] = [];
+  return dynamicMap;
+}
 
-  // Generate list for subnets 1 to 128
-  for (let netuid = 1; netuid <= 128; netuid++) {
-    const enabled = enabledMap.get(netuid) ?? true;
+export async function queryBlockEmissionSnapshot(
+  apiAt: ApiDecoration<'promise'>
+): Promise<{ events: any[]; subnetsData: SubnetBlockData[] }> {
+  const storageCalls: any[] = [
+    apiAt.query.system.events,
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetEmissionEnabled, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetExcessTao, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.rootProp, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.minerBurned, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.ownerCutEnabled, netuid]),
+    apiAt.query.subtensorModule.subnetOwnerCut
+  ];
 
-    // Convert from Rao (9 decimals) to TAO
-    const rawTaoIn = taoInMap.get(netuid) ?? 0;
-    const rawExcessTao = excessTaoMap.get(netuid) ?? 0;
-    const rawSubnetTao = subnetTaoMap.get(netuid) ?? 0;
+  const [rawDynamicInfo, rawPrices, storageValues] = await Promise.all([
+    apiAt.call.subnetInfoRuntimeApi.getAllDynamicInfo(),
+    apiAt.call.swapRuntimeApi.currentAlphaPriceAll(),
+    apiAt.queryMulti(storageCalls) as Promise<any[]>
+  ]);
 
-    const tao_in = enabled ? rawTaoIn / 1e9 : 0;
-    const excess_tao = enabled ? rawExcessTao / 1e9 : 0;
-    const subnet_tao = rawSubnetTao / 1e9;
+  let offset = 0;
+  const events = storageValues[offset++] as any[];
+  const enabledValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const excessTaoValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const rootPropValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const minerBurnedValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const ownerCutEnabledValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const globalOwnerCut = storageValues[offset];
 
-    const alpha_in = enabled ? (alphaInMap.get(netuid) ?? 0) / 1e9 : 0;
-    const alpha_out = (alphaOutMap.get(netuid) ?? 0) / 1e9;
+  const dynamicMap = buildDynamicInfoMap(rawDynamicInfo);
+  const priceMap = buildPriceMap(rawPrices);
+  const baseOwnerCut = codecToNumber(globalOwnerCut) / 65535;
 
-    const alphaReserve = subnetAlphaInMap.get(netuid) ?? 0;
-    const alpha_price = priceMap.get(netuid) ?? 0.0;
+  const subnetsData = NETUIDS.map((netuid, index): SubnetBlockData => {
+    const dynamicInfo = dynamicMap.get(netuid);
+    const enabled = codecToBoolean(enabledValues[index], true);
+    const alpha_out = codecToNumber(dynamicInfo?.alphaOutEmission) / RAO_PER_TAO;
+    const alpha_price = priceMap.get(netuid) ?? 0;
+    const root_prop = fixed32ToNumber(rootPropValues[index]);
+    const owner_cut = codecToBoolean(ownerCutEnabledValues[index], true) ? baseOwnerCut : 0;
+    const neuron_alpha = alpha_out * (1 - owner_cut) * (1 - root_prop * 0.5);
 
-    const root_prop = rootPropMap.get(netuid) ?? 0;
-    const miner_burned = minerBurnedMap.get(netuid) ?? 0;
-    const moving_price = movingPriceMap.get(netuid) ?? 0;
-
-    const ownerCutEnabled = ownerCutEnabledMap.get(netuid) ?? true;
-    const owner_cut = ownerCutEnabled ? baseOwnerCut : 0.0;
-    const after_owner = alpha_out * (1 - owner_cut);
-    const neuron_alpha = after_owner * (1 - root_prop * 0.5);
-    const total_neuron_em = neuron_alpha * alpha_price;
-
-    const status: SubnetBlockData['status'] = enabled ? '正常排放' : '禁止排放';
-
-    subnetsData.push({
+    return {
       netuid,
       enabled,
-      status,
-      tao_in,
-      alpha_in,
+      status: enabled ? '正常排放' : '禁止排放',
+      tao_in: enabled ? codecToNumber(dynamicInfo?.taoInEmission) / RAO_PER_TAO : 0,
+      alpha_in: enabled ? codecToNumber(dynamicInfo?.alphaInEmission) / RAO_PER_TAO : 0,
       alpha_out,
-      excess_tao,
+      excess_tao: enabled ? codecToNumber(excessTaoValues[index]) / RAO_PER_TAO : 0,
       emission_share: 0,
-      subnet_tao,
-      subnet_alpha: alphaReserve / 1e9,
+      subnet_tao: codecToNumber(dynamicInfo?.taoIn) / RAO_PER_TAO,
+      subnet_alpha: codecToNumber(dynamicInfo?.alphaIn) / RAO_PER_TAO,
       alpha_price,
-      total_neuron_em,
+      total_neuron_em: neuron_alpha * alpha_price,
       root_prop,
-      miner_burned,
-      moving_price
-    });
-  }
+      miner_burned: fixed32ToNumber(minerBurnedValues[index]),
+      moving_price: fixed32ToNumber(dynamicInfo?.movingPrice)
+    };
+  });
 
-  return subnetsData;
+  return { events, subnetsData };
 }
