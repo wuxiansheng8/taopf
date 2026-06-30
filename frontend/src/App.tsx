@@ -142,7 +142,7 @@ export default function App() {
         <nav className="flex-grow space-y-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
               activeTab === 'dashboard'
                 ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -154,7 +154,7 @@ export default function App() {
           
           <button
             onClick={() => setActiveTab('liquidation')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
               activeTab === 'liquidation'
                 ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -166,7 +166,7 @@ export default function App() {
           
           <button
             onClick={() => setActiveTab('logs')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
               activeTab === 'logs'
                 ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -178,7 +178,7 @@ export default function App() {
           
           <button
             onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
               activeTab === 'settings'
                 ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -191,7 +191,7 @@ export default function App() {
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-lg text-xs font-semibold border border-white/5 transition"
+          className="w-full flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-lg text-sm font-semibold border border-white/5 transition"
         >
           <Lock size={14} />
           <span>退出登录</span>
