@@ -43,9 +43,7 @@ export default function App() {
       
       if (dataMode === 'current') {
         setLastSuccessBlock(res.data.block_number);
-        if (latestChainBlock < res.data.block_number) {
-          setLatestChainBlock(res.data.block_number);
-        }
+        setLatestChainBlock((prev) => Math.max(prev, res.data.block_number));
         setBeijingTime(res.data.beijing_time);
         setSubnetsData(res.data.subnets || []);
       } else {
@@ -60,6 +58,9 @@ export default function App() {
     try {
       const res = await client.get('/api/liquidation/current');
       setLiquidationSnapshot(res.data);
+      setLastSuccessBlock(res.data.block_number);
+      setLatestChainBlock((prev) => Math.max(prev, res.data.block_number));
+      setBeijingTime(res.data.beijing_time);
     } catch (err) {
       console.error('Failed to load liquidation snapshot:', err);
     }
@@ -88,6 +89,10 @@ export default function App() {
       
       if (data.liquidation) {
         setLiquidationSnapshot(data.liquidation);
+      }
+
+      if (activeTab === 'liquidation') {
+        setLastSuccessBlock(data.block_number);
       }
       
       if (activeTab === 'dashboard') {
