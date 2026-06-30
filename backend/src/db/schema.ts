@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS emissions_history (
     root_prop REAL DEFAULT 0,
     miner_burned REAL DEFAULT 0,
     moving_price REAL DEFAULT 0,
+    registration_allowed INTEGER DEFAULT 1,
+    subnetwork_n INTEGER DEFAULT 0,
+    max_allowed_uids INTEGER DEFAULT 0,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (block_number, netuid)
 );

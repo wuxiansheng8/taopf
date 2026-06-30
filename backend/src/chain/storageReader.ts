@@ -3,7 +3,7 @@ import { SubnetBlockData } from '../../../shared/types.js';
 import { codecToBoolean, codecToNumber, fixed32ToNumber, RAO_PER_TAO } from './chainValueParser.js';
 
 const NETUIDS = Array.from({ length: 128 }, (_, i) => i + 1);
-const EXPECTED_STORAGE_VALUES = 1 + NETUIDS.length * 5 + 1;
+const EXPECTED_STORAGE_VALUES = 1 + NETUIDS.length * 8 + 1;
 
 interface DynamicInfoJson {
   netuid: number;
@@ -73,6 +73,9 @@ export async function queryBlockEmissionSnapshot(
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.rootProp, netuid]),
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.minerBurned, netuid]),
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.ownerCutEnabled, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.networkRegistrationAllowed, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetworkN, netuid]),
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.maxAllowedUids, netuid]),
     apiAt.query.subtensorModule.subnetOwnerCut
   ];
 
@@ -89,6 +92,9 @@ export async function queryBlockEmissionSnapshot(
   const rootPropValues = storageValues.slice(offset, offset += NETUIDS.length);
   const minerBurnedValues = storageValues.slice(offset, offset += NETUIDS.length);
   const ownerCutEnabledValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const registrationAllowedValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const subnetworkNValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const maxAllowedUidsValues = storageValues.slice(offset, offset += NETUIDS.length);
   const globalOwnerCut = storageValues[offset];
 
   const dynamicMap = buildDynamicInfoMap(rawDynamicInfo);
@@ -120,7 +126,10 @@ export async function queryBlockEmissionSnapshot(
       total_neuron_em: neuron_alpha * alpha_price,
       root_prop,
       miner_burned: fixed32ToNumber(minerBurnedValues[index]),
-      moving_price: fixed32ToNumber(dynamicInfo?.movingPrice)
+      moving_price: fixed32ToNumber(dynamicInfo?.movingPrice),
+      registration_allowed: codecToBoolean(registrationAllowedValues[index], true),
+      subnetwork_n: codecToNumber(subnetworkNValues[index]),
+      max_allowed_uids: codecToNumber(maxAllowedUidsValues[index])
     };
   });
 

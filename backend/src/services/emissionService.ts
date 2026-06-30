@@ -103,7 +103,10 @@ export async function initEmissionsCache(): Promise<void> {
         total_neuron_em: row.total_neuron_em,
         root_prop: row.root_prop || 0,
         miner_burned: row.miner_burned || 0,
-        moving_price: row.moving_price || 0
+        moving_price: row.moving_price || 0,
+        registration_allowed: row.registration_allowed === 1,
+        subnetwork_n: row.subnetwork_n || 0,
+        max_allowed_uids: row.max_allowed_uids || 0
       })))
     };
     logger.info(`已同步初始化最新区块数据为 #${latestBNum} (${CURRENT_BLOCK_DATA.subnets.length} 个子网)`);
@@ -127,12 +130,12 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
     for (const sub of subnetsWithShares) {
       await db.run(
         `INSERT OR REPLACE INTO emissions_history 
-        (block_number, netuid, enabled, status, tao_in, alpha_in, alpha_out, excess_tao, subnet_tao, subnet_alpha, alpha_price, total_neuron_em, root_prop, miner_burned, moving_price, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (block_number, netuid, enabled, status, tao_in, alpha_in, alpha_out, excess_tao, subnet_tao, subnet_alpha, alpha_price, total_neuron_em, root_prop, miner_burned, moving_price, registration_allowed, subnetwork_n, max_allowed_uids, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           blockNumber, sub.netuid, sub.enabled ? 1 : 0, sub.status,
           sub.tao_in, sub.alpha_in, sub.alpha_out, sub.excess_tao, sub.subnet_tao, sub.subnet_alpha, sub.alpha_price, sub.total_neuron_em,
-          sub.root_prop, sub.miner_burned, sub.moving_price, beijingTime
+          sub.root_prop, sub.miner_burned, sub.moving_price, sub.registration_allowed ? 1 : 0, sub.subnetwork_n, sub.max_allowed_uids, beijingTime
         ]
       );
     }
@@ -226,7 +229,10 @@ export function get24hAggregatedEmissions(): SubnetBlockData[] {
       total_neuron_em: sums.total_neuron_em,
       root_prop: currentSub.root_prop,
       miner_burned: currentSub.miner_burned,
-      moving_price: currentSub.moving_price
+      moving_price: currentSub.moving_price,
+      registration_allowed: currentSub.registration_allowed,
+      subnetwork_n: currentSub.subnetwork_n,
+      max_allowed_uids: currentSub.max_allowed_uids
     });
   }
   return withEmissionShares(output);

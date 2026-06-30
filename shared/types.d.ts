@@ -14,6 +14,9 @@ export interface SubnetBlockData {
   root_prop: number;
   miner_burned: number;
   moving_price: number;
+  registration_allowed: boolean;
+  subnetwork_n: number;
+  max_allowed_uids: number;
 }
 
 export interface BlockEmissionRecord {

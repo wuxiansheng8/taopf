@@ -99,6 +99,25 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
       columnHelper.accessor('total_neuron_em', {
         header: '神经元排放',
         cell: (info) => <span className="font-semibold text-white">{info.getValue().toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
+      }),
+      columnHelper.accessor('registration_allowed', {
+        header: '矿工/验证者名额',
+        cell: (info) => {
+          const subnet = info.row.original;
+          if (!info.getValue()) {
+            return (
+              <span className="px-2 py-0.5 text-xs rounded border text-red-400 bg-red-500/10 border-red-500/20 font-medium">
+                未开启
+              </span>
+            );
+          }
+
+          return (
+            <span className="font-semibold text-white">
+              {subnet.subnetwork_n}/{subnet.max_allowed_uids}
+            </span>
+          );
+        }
       })
     ],
     []

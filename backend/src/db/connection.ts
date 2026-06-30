@@ -31,7 +31,10 @@ export async function getDb(): Promise<Database> {
     'subnet_alpha REAL DEFAULT 0',
     'root_prop REAL DEFAULT 0',
     'miner_burned REAL DEFAULT 0',
-    'moving_price REAL DEFAULT 0'
+    'moving_price REAL DEFAULT 0',
+    'registration_allowed INTEGER DEFAULT 1',
+    'subnetwork_n INTEGER DEFAULT 0',
+    'max_allowed_uids INTEGER DEFAULT 0'
   ]) {
     try {
       await dbInstance.exec(`ALTER TABLE emissions_history ADD COLUMN ${col};`);
