@@ -83,6 +83,7 @@ export default function App() {
 
     sse.addEventListener('block', (e) => {
       const data = JSON.parse(e.data);
+      setLastSuccessBlock(data.block_number);
       setLatestChainBlock(data.block_number);
       setBeijingTime(data.beijing_time);
       setUptimeSeconds(data.uptime);
@@ -91,13 +92,8 @@ export default function App() {
         setLiquidationSnapshot(data.liquidation);
       }
 
-      if (activeTab === 'liquidation') {
-        setLastSuccessBlock(data.block_number);
-      }
-      
       if (activeTab === 'dashboard') {
         if (dataMode === 'current') {
-          setLastSuccessBlock(data.block_number);
           setSubnetsData(data.subnets || []);
         } else {
           // In 24h mode, pull latest rolling stats
