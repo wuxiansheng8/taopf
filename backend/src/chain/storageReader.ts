@@ -3,6 +3,7 @@ import { SubnetBlockData } from '../../../shared/types.js';
 import { codecToBoolean, codecToNumber, fixed32ToNumber, RAO_PER_TAO } from './chainValueParser.js';
 
 const NETUIDS = Array.from({ length: 128 }, (_, i) => i + 1);
+const EXPECTED_STORAGE_VALUES = 1 + NETUIDS.length * 5 + 1;
 
 interface DynamicInfoJson {
   netuid: number;
@@ -42,6 +43,26 @@ function buildDynamicInfoMap(rawDynamicInfo: any): Map<number, DynamicInfoJson> 
   return dynamicMap;
 }
 
+function assertCompleteSnapshot(
+  storageValues: any[],
+  dynamicMap: Map<number, DynamicInfoJson>,
+  priceMap: Map<number, number>
+): void {
+  if (storageValues.length !== EXPECTED_STORAGE_VALUES) {
+    throw new Error(`链上批量查询返回数量异常: ${storageValues.length}/${EXPECTED_STORAGE_VALUES}`);
+  }
+
+  const missingDynamic = NETUIDS.filter((netuid) => !dynamicMap.has(netuid));
+  if (missingDynamic.length > 0) {
+    throw new Error(`DynamicInfo 缺少子网: ${missingDynamic.join(',')}`);
+  }
+
+  const missingPrices = NETUIDS.filter((netuid) => !priceMap.has(netuid));
+  if (missingPrices.length > 0) {
+    throw new Error(`Alpha 价格缺少子网: ${missingPrices.join(',')}`);
+  }
+}
+
 export async function queryBlockEmissionSnapshot(
   apiAt: ApiDecoration<'promise'>
 ): Promise<{ events: any[]; subnetsData: SubnetBlockData[] }> {
@@ -72,6 +93,7 @@ export async function queryBlockEmissionSnapshot(
 
   const dynamicMap = buildDynamicInfoMap(rawDynamicInfo);
   const priceMap = buildPriceMap(rawPrices);
+  assertCompleteSnapshot(storageValues, dynamicMap, priceMap);
   const baseOwnerCut = codecToNumber(globalOwnerCut) / 65535;
 
   const subnetsData = NETUIDS.map((netuid, index): SubnetBlockData => {
