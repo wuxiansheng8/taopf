@@ -153,7 +153,7 @@ export default function App() {
             }`}
           >
             <Activity size={16} />
-            <span>数据面板</span>
+            <span>排放统计</span>
           </button>
           
           <button
@@ -233,7 +233,7 @@ export default function App() {
                       dataMode === '24h' ? 'bg-white/5 text-white' : 'text-gray-400 hover:text-white'
                     }`}
                   >
-                    24H 统计 (7200区块)
+                    24H 排放统计
                   </button>
                 </div>
 
