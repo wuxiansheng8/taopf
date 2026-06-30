@@ -3,6 +3,7 @@ import { getSetting, setSetting } from '../services/settingsService.js';
 import { testTelegramBot } from '../services/telegramService.js';
 import { testRpc, disconnectApi } from '../chain/api.js';
 import { verifyToken } from '../utils/jwt.js';
+import { normalizeRpcEndpoints, parseRpcEndpoints } from '../utils/rpcEndpoints.js';
 
 async function checkAuth(request: any, reply: any) {
   const authHeader = request.headers.authorization;
@@ -39,12 +40,13 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     
     const { rpc_endpoints, telegram_token, telegram_chat_id } = request.body as any;
     const oldEndpoints = await getSetting('rpc_endpoints', 'wss://entrypoint-finney.opentensor.ai:443');
+    const normalizedRpcEndpoints = normalizeRpcEndpoints(rpc_endpoints || '');
     
-    await setSetting('rpc_endpoints', rpc_endpoints || '');
+    await setSetting('rpc_endpoints', normalizedRpcEndpoints);
     await setSetting('telegram_token', telegram_token || '');
     await setSetting('telegram_chat_id', telegram_chat_id || '');
     
-    if (rpc_endpoints && rpc_endpoints !== oldEndpoints) {
+    if (normalizedRpcEndpoints !== normalizeRpcEndpoints(oldEndpoints)) {
       await disconnectApi();
     }
     
@@ -67,13 +69,28 @@ export async function settingsRoutes(fastify: FastifyInstance) {
   fastify.post('/api/test-rpc', async (request, reply) => {
     if (!(await checkAuth(request, reply))) return;
     
-    const { endpoint } = request.body as any;
-    const result = await testRpc(endpoint);
+    const { endpoint, endpoints } = request.body as any;
+    const urls = Array.isArray(endpoints)
+      ? parseRpcEndpoints(endpoints.map((item) => String(item)).join('\n'))
+      : parseRpcEndpoints(endpoint || '');
     
-    if (result.success) {
-      return result;
-    } else {
-      return reply.status(400).send({ detail: result.error || '测试失败' });
+    if (urls.length === 0) {
+      return reply.status(400).send({ detail: 'RPC 节点为空' });
     }
+
+    const results = [];
+    for (const url of urls) {
+      const result = await testRpc(url);
+      results.push({ endpoint: url, ...result });
+    }
+
+    const successCount = results.filter((result) => result.success).length;
+    return {
+      success: successCount > 0,
+      total: results.length,
+      success_count: successCount,
+      failed_count: results.length - successCount,
+      results
+    };
   });
 }

@@ -1,9 +1,25 @@
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { getSetting } from '../services/settingsService.js';
 import { logger } from '../services/logService.js';
+import { parseRpcEndpoints } from '../utils/rpcEndpoints.js';
 
 let apiPromise: ApiPromise | null = null;
 let currentProvider: WsProvider | null = null;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
 
 export async function getApi(): Promise<ApiPromise> {
   if (apiPromise && apiPromise.isConnected) {
@@ -17,7 +33,7 @@ export async function getApi(): Promise<ApiPromise> {
   }
 
   const endpointsStr = await getSetting('rpc_endpoints', 'wss://entrypoint-finney.opentensor.ai:443');
-  const urls = endpointsStr.split(',').map(e => e.trim()).filter(e => e.length > 0);
+  const urls = parseRpcEndpoints(endpointsStr);
   
   if (urls.length === 0) {
     throw new Error('未配置 RPC 节点地址！');
@@ -43,10 +59,10 @@ export async function testRpc(endpoint: string): Promise<{ success: boolean; lat
   try {
     provider = new WsProvider(endpoint);
     api = new ApiPromise({ provider });
-    await api.isReady;
+    await withTimeout(api.isReady, 10000, '连接超时');
     
     // Test runtime version
-    const runtime = await api.rpc.state.getRuntimeVersion();
+    const runtime = await withTimeout(api.rpc.state.getRuntimeVersion(), 10000, '版本检测超时');
     const version = runtime.specVersion.toNumber();
     
     const latency = `${Date.now() - t0} ms`;
