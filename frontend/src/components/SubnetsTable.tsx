@@ -102,6 +102,14 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
       }),
       columnHelper.accessor('registration_allowed', {
         header: '矿工/验证者名额',
+        sortingFn: (rowA, rowB) => {
+          const getRemainingSlots = (subnet: SubnetBlockData) => {
+            if (!subnet.registration_allowed) return -1;
+            return Math.max(0, subnet.max_allowed_uids - subnet.subnetwork_n);
+          };
+
+          return getRemainingSlots(rowA.original) - getRemainingSlots(rowB.original);
+        },
         cell: (info) => {
           const subnet = info.row.original;
           if (!info.getValue()) {
