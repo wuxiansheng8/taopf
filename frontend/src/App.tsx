@@ -140,7 +140,7 @@ export default function App() {
       <aside className="w-60 h-[calc(100vh-24px)] m-3 flex flex-col p-6 glass-panel rounded-2xl flex-shrink-0">
         <div className="flex items-center gap-3 mb-10">
           <span className="text-2xl text-accentBlue drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">☯</span>
-          <h2 className="text-lg font-bold tracking-wide text-white">TAOPF Monitor</h2>
+          <h2 className="text-lg font-bold tracking-wide text-white">Bittensor生态</h2>
         </div>
 
         <nav className="flex-grow space-y-2">
