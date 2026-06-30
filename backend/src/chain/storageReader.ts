@@ -3,7 +3,7 @@ import { SubnetBlockData } from '../../../shared/types.js';
 import { codecToBoolean, codecToNumber, fixed32ToNumber, RAO_PER_TAO } from './chainValueParser.js';
 
 const NETUIDS = Array.from({ length: 128 }, (_, i) => i + 1);
-const EXPECTED_STORAGE_VALUES = 1 + NETUIDS.length * 8 + 1;
+const EXPECTED_STORAGE_VALUES = 1 + NETUIDS.length * 9 + 3;
 
 interface DynamicInfoJson {
   netuid: number;
@@ -13,7 +13,27 @@ interface DynamicInfoJson {
   taoIn?: unknown;
   alphaIn?: unknown;
   movingPrice?: unknown;
+  subnetName?: unknown;
+  networkRegisteredAt?: unknown;
 }
+
+function decodeBytes(value: unknown): string {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    if (value.startsWith('0x')) {
+      return Buffer.from(value.slice(2), 'hex').toString('utf8').replace(/\0/g, '').trim();
+    }
+    return value.replace(/\0/g, '').trim();
+  }
+  if (Array.isArray(value)) {
+    return Buffer.from(value.map(Number).filter(Number.isFinite))
+      .toString('utf8')
+      .replace(/\0/g, '')
+      .trim();
+  }
+  return String(value).replace(/\0/g, '').trim();
+}
+
 
 function buildPriceMap(rawPrices: any): Map<number, number> {
   const priceMap = new Map<number, number>();
@@ -63,9 +83,26 @@ function assertCompleteSnapshot(
   }
 }
 
+export interface LiquidationSubnetRaw {
+  netuid: number;
+  subnet_name: string;
+  moving_price: number;
+  registered_block: number;
+  locked_tao: number;
+}
+
 export async function queryBlockEmissionSnapshot(
   apiAt: ApiDecoration<'promise'>
-): Promise<{ events: any[]; subnetsData: SubnetBlockData[] }> {
+): Promise<{ 
+  events: any[]; 
+  subnetsData: SubnetBlockData[]; 
+  rawLiquidation: {
+    subnet_limit: number;
+    current_lock_cost: number;
+    network_immunity_period: number;
+    liquidationSubnetsRaw: LiquidationSubnetRaw[];
+  }
+}> {
   const storageCalls: any[] = [
     apiAt.query.system.events,
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetEmissionEnabled, netuid]),
@@ -76,12 +113,18 @@ export async function queryBlockEmissionSnapshot(
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.networkRegistrationAllowed, netuid]),
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetworkN, netuid]),
     ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.maxAllowedUids, netuid]),
-    apiAt.query.subtensorModule.subnetOwnerCut
+    apiAt.query.subtensorModule.subnetOwnerCut,
+    apiAt.query.subtensorModule.networkImmunityPeriod,
+    apiAt.query.subtensorModule.subnetLimit,
+    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetLocked, netuid])
   ];
 
-  const [rawDynamicInfo, rawPrices, storageValues] = await Promise.all([
+  const [rawDynamicInfo, rawPrices, rawLockCost, storageValues] = await Promise.all([
     apiAt.call.subnetInfoRuntimeApi.getAllDynamicInfo(),
     apiAt.call.swapRuntimeApi.currentAlphaPriceAll(),
+    apiAt.call.subnetRegistrationRuntimeApi?.getNetworkRegistrationCost 
+      ? apiAt.call.subnetRegistrationRuntimeApi.getNetworkRegistrationCost() 
+      : Promise.resolve(null),
     apiAt.queryMulti(storageCalls) as Promise<any[]>
   ]);
 
@@ -95,12 +138,20 @@ export async function queryBlockEmissionSnapshot(
   const registrationAllowedValues = storageValues.slice(offset, offset += NETUIDS.length);
   const subnetworkNValues = storageValues.slice(offset, offset += NETUIDS.length);
   const maxAllowedUidsValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const globalOwnerCut = storageValues[offset];
+  
+  const globalOwnerCut = storageValues[offset++];
+  const networkImmunityPeriod = storageValues[offset++];
+  const subnetLimit = storageValues[offset++];
+  const subnetLockedValues = storageValues.slice(offset, offset += NETUIDS.length);
 
   const dynamicMap = buildDynamicInfoMap(rawDynamicInfo);
   const priceMap = buildPriceMap(rawPrices);
   assertCompleteSnapshot(storageValues, dynamicMap, priceMap);
   const baseOwnerCut = codecToNumber(globalOwnerCut) / 65535;
+
+  const current_lock_cost = rawLockCost ? Number(rawLockCost.toString()) / 1e9 : 0;
+
+  const liquidationSubnetsRaw: LiquidationSubnetRaw[] = [];
 
   const subnetsData = NETUIDS.map((netuid, index): SubnetBlockData => {
     const dynamicInfo = dynamicMap.get(netuid);
@@ -110,6 +161,18 @@ export async function queryBlockEmissionSnapshot(
     const root_prop = fixed32ToNumber(rootPropValues[index]);
     const owner_cut = codecToBoolean(ownerCutEnabledValues[index], true) ? baseOwnerCut : 0;
     const neuron_alpha = alpha_out * (1 - owner_cut) * (1 - root_prop * 0.5);
+
+    const subnet_name = decodeBytes(dynamicInfo?.subnetName);
+    const locked = codecToNumber(subnetLockedValues[index]) / RAO_PER_TAO;
+    const regBlock = dynamicInfo ? Number(dynamicInfo.networkRegisteredAt || 0) : 0;
+
+    liquidationSubnetsRaw.push({
+      netuid,
+      subnet_name,
+      moving_price: fixed32ToNumber(dynamicInfo?.movingPrice),
+      registered_block: regBlock,
+      locked_tao: locked
+    });
 
     return {
       netuid,
@@ -133,5 +196,14 @@ export async function queryBlockEmissionSnapshot(
     };
   });
 
-  return { events, subnetsData };
+  return { 
+    events, 
+    subnetsData, 
+    rawLiquidation: {
+      subnet_limit: codecToNumber(subnetLimit),
+      current_lock_cost,
+      network_immunity_period: codecToNumber(networkImmunityPeriod),
+      liquidationSubnetsRaw
+    }
+  };
 }

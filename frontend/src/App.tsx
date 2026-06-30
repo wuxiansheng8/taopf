@@ -4,13 +4,14 @@ import Header from './components/Header.tsx';
 import SubnetsTable from './components/SubnetsTable.tsx';
 import LogsPanel, { LogItem } from './components/LogsPanel.tsx';
 import SettingsPanel from './components/SettingsPanel.tsx';
+import LiquidationPanel from './components/LiquidationPanel.tsx';
 import client from './api/client.ts';
-import { SubnetBlockData } from '../../shared/types.ts';
-import { Activity, Terminal, Settings, Lock } from 'lucide-react';
+import { SubnetBlockData, LiquidationSnapshot } from '../../shared/types.ts';
+import { Activity, Terminal, Settings, Lock, TrendingDown } from 'lucide-react';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('taopf_token'));
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'logs' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'liquidation' | 'logs' | 'settings'>('dashboard');
   const [dataMode, setDataMode] = useState<'current' | '24h'>('current');
 
   // Stats State
@@ -19,6 +20,7 @@ export default function App() {
   const [beijingTime, setBeijingTime] = useState('');
   const [uptimeSeconds, setUptimeSeconds] = useState(0);
   const [subnetsData, setSubnetsData] = useState<SubnetBlockData[]>([]);
+  const [liquidationSnapshot, setLiquidationSnapshot] = useState<LiquidationSnapshot | null>(null);
 
   // Logs stream
   const [realtimeLogs, setRealtimeLogs] = useState<LogItem[]>([]);
@@ -54,10 +56,23 @@ export default function App() {
     }
   };
 
+  const fetchLiquidationData = async () => {
+    try {
+      const res = await client.get('/api/liquidation/current');
+      setLiquidationSnapshot(res.data);
+    } catch (err) {
+      console.error('Failed to load liquidation snapshot:', err);
+    }
+  };
+
   useEffect(() => {
     if (!token) return;
-    fetchData();
-  }, [token, dataMode]);
+    if (activeTab === 'dashboard') {
+      fetchData();
+    } else if (activeTab === 'liquidation') {
+      fetchLiquidationData();
+    }
+  }, [token, dataMode, activeTab]);
 
   // Subscribe to SSE
   useEffect(() => {
@@ -71,12 +86,18 @@ export default function App() {
       setBeijingTime(data.beijing_time);
       setUptimeSeconds(data.uptime);
       
-      if (dataMode === 'current') {
-        setLastSuccessBlock(data.block_number);
-        setSubnetsData(data.subnets || []);
-      } else {
-        // In 24h mode, pull latest rolling stats
-        fetchData();
+      if (data.liquidation) {
+        setLiquidationSnapshot(data.liquidation);
+      }
+      
+      if (activeTab === 'dashboard') {
+        if (dataMode === 'current') {
+          setLastSuccessBlock(data.block_number);
+          setSubnetsData(data.subnets || []);
+        } else {
+          // In 24h mode, pull latest rolling stats
+          fetchData();
+        }
       }
     });
 
@@ -91,7 +112,7 @@ export default function App() {
     };
 
     return () => sse.close();
-  }, [token, dataMode]);
+  }, [token, dataMode, activeTab]);
 
   // Totals calculations
   const totals = useMemo(() => {
@@ -128,6 +149,18 @@ export default function App() {
           >
             <Activity size={16} />
             <span>数据面板</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('liquidation')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              activeTab === 'liquidation'
+                ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <TrendingDown size={16} />
+            <span>子网清算</span>
           </button>
           
           <button
@@ -211,6 +244,10 @@ export default function App() {
                 <SubnetsTable data={subnetsData} />
               </div>
             </div>
+          )}
+
+          {activeTab === 'liquidation' && (
+            <LiquidationPanel snapshot={liquidationSnapshot} />
           )}
 
           {activeTab === 'logs' && <LogsPanel realtimeLogs={realtimeLogs} />}

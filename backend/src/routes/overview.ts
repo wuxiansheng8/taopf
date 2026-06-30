@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getCurrentBlockEmissions, get24hAggregatedEmissions, blockEmitter } from '../services/emissionService.js';
 import { logEmitter } from '../services/logService.js';
+import { getLiquidationSnapshot } from '../services/liquidationService.js';
 
 export async function overviewRoutes(fastify: FastifyInstance) {
   fastify.get('/api/emissions/current', async (request, reply) => {
@@ -9,6 +10,14 @@ export async function overviewRoutes(fastify: FastifyInstance) {
 
   fastify.get('/api/emissions/24h', async (request, reply) => {
     return get24hAggregatedEmissions();
+  });
+
+  fastify.get('/api/liquidation/current', async (request, reply) => {
+    const snapshot = getLiquidationSnapshot();
+    if (!snapshot) {
+      return reply.status(404).send({ error: '清算快照尚未初始化，请等待新块到达' });
+    }
+    return snapshot;
   });
 
   fastify.get('/api/stream', async (request, reply) => {

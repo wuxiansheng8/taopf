@@ -3,6 +3,8 @@ import { queryBlockEmissionSnapshot } from './storageReader.js';
 import { parseBlockEvents } from './eventParser.js';
 import { addBlockEmissions } from '../services/emissionService.js';
 import { logger } from '../services/logService.js';
+import { updateLiquidationSnapshot } from '../services/liquidationService.js';
+import { LiquidationSubnet, LiquidationSnapshot } from '../../../shared/types.js';
 
 let isListening = false;
 
@@ -29,15 +31,67 @@ export async function startChainListener(): Promise<void> {
           processingQueue = processingQueue.then(async () => {
             try {
               const apiAt = await api.at(blockHash);
-              const { events, subnetsData } = await queryBlockEmissionSnapshot(apiAt);
+              const { events, subnetsData, rawLiquidation } = await queryBlockEmissionSnapshot(apiAt);
               parseBlockEvents(events as any, blockNumber);
               
               const now = new Date();
               const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
               const beijingTime = new Date(utc + (3600000 * 8)).toISOString().replace('T', ' ').substring(0, 19);
-              
-              await addBlockEmissions(blockNumber, beijingTime, subnetsData);
-              
+
+              // Calculate Liquidation snapshot
+              const allSubnets: LiquidationSubnet[] = rawLiquidation.liquidationSubnetsRaw.map((sub): LiquidationSubnet => {
+                const netuid = sub.netuid;
+                const regBlock = sub.registered_block;
+                const immunityPeriod = rawLiquidation.network_immunity_period;
+                const immunityEndBlock = regBlock + immunityPeriod;
+                const isImmune = regBlock > 0 && (blockNumber - regBlock < immunityPeriod);
+                const remainingBlocks = isImmune ? (immunityEndBlock - blockNumber) : 0;
+                
+                return {
+                  netuid,
+                  subnet_name: sub.subnet_name,
+                  moving_price: sub.moving_price,
+                  registered_block: regBlock,
+                  immunity_end_block: immunityEndBlock,
+                  locked_tao: sub.locked_tao,
+                  remaining_blocks: remainingBlocks,
+                  remaining_seconds: remainingBlocks * 12,
+                  is_immune: isImmune
+                };
+              });
+
+              const liquidation_candidates = allSubnets
+                .filter(s => !s.is_immune)
+                .sort((a, b) => a.moving_price - b.moving_price || a.registered_block - b.registered_block);
+
+              const prune_candidate = liquidation_candidates[0] ?? null;
+              const lowest_ema_subnets = liquidation_candidates.slice(0, 10);
+
+              const immune_subnets = allSubnets
+                .filter(s => s.is_immune)
+                .sort((a, b) => a.registered_block - b.registered_block);
+
+              const immune_count = immune_subnets.length;
+              const non_immune_count = allSubnets.length - immune_count;
+
+              const liquidationSnapshot: LiquidationSnapshot = {
+                block_number: blockNumber,
+                beijing_time: beijingTime,
+                total_networks: allSubnets.length,
+                subnet_limit: rawLiquidation.subnet_limit,
+                current_lock_cost: rawLiquidation.current_lock_cost,
+                network_immunity_period: rawLiquidation.network_immunity_period,
+                prune_candidate,
+                immune_count,
+                non_immune_count,
+                lowest_ema_subnets,
+                immune_subnets
+              };
+
+              updateLiquidationSnapshot(liquidationSnapshot);
+
+              await addBlockEmissions(blockNumber, beijingTime, subnetsData, liquidationSnapshot);
+
               blockLatencies.push(Date.now() - t0);
               if (blockLatencies.length >= 100) {
                 const sum = blockLatencies.reduce((a, b) => a + b, 0);

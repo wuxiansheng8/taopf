@@ -1,5 +1,5 @@
 import { getDb } from '../db/connection.js';
-import { SubnetBlockData, BlockEmissionRecord } from '../../../shared/types.js';
+import { SubnetBlockData, BlockEmissionRecord, LiquidationSnapshot } from '../../../shared/types.js';
 import { logger } from './logService.js';
 import { EventEmitter } from 'events';
 
@@ -117,7 +117,12 @@ export async function initEmissionsCache(): Promise<void> {
 }
 
 // Add new block emissions, write to DB, and slide the cache window
-export async function addBlockEmissions(blockNumber: number, beijingTime: string, subnets: SubnetBlockData[]): Promise<void> {
+export async function addBlockEmissions(
+  blockNumber: number,
+  beijingTime: string,
+  subnets: SubnetBlockData[],
+  liquidation?: LiquidationSnapshot
+): Promise<void> {
   if (blockNumber <= CURRENT_BLOCK_DATA.block_number) {
     logger.warn(`检测到重复或旧区块 #${blockNumber}，已跳过数据落盘与累加（当前最新区块: #${CURRENT_BLOCK_DATA.block_number}）`);
     return;
@@ -199,7 +204,8 @@ export async function addBlockEmissions(blockNumber: number, beijingTime: string
     block_number: blockNumber,
     beijing_time: beijingTime,
     uptime: Math.floor((Date.now() - uptimeStart) / 1000),
-    subnets: subnetsWithShares
+    subnets: subnetsWithShares,
+    liquidation // 追加属性发送至前端
   });
 }
 
