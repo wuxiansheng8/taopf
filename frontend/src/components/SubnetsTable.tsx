@@ -27,13 +27,13 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
       columnHelper.accessor('status', {
         header: '排放状态',
         cell: (info) => {
-          const val = info.getValue();
-          const color = val === '正常排放'
+          const enabled = info.row.original.enabled;
+          const color = enabled
             ? 'text-green-400 bg-green-500/10 border-green-500/20'
             : 'text-red-400 bg-red-500/10 border-red-500/20';
           return (
             <span className={`px-2 py-0.5 text-xs rounded border ${color} font-medium`}>
-              {val}
+              {enabled ? '启用' : '停用'}
             </span>
           );
         }
@@ -52,11 +52,11 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
         }
       }),
       columnHelper.accessor('tao_in', {
-        header: 'TAO 注入量',
+        header: '池子 TAO 注入',
         cell: (info) => <span className="font-semibold text-white">{info.getValue().toFixed(4)}</span>
       }),
       columnHelper.accessor('alpha_in', {
-        header: 'Alpha 注入量',
+        header: '池子 Alpha 注入',
         cell: (info) => <span className="font-semibold text-white">{info.getValue().toFixed(4)}</span>
       }),
       columnHelper.accessor('excess_tao', {
@@ -64,11 +64,11 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
         cell: (info) => <span className="font-semibold text-white">{info.getValue().toFixed(4)}</span>
       }),
       columnHelper.accessor('alpha_price', {
-        header: 'Alpha 价格',
+        header: 'Alpha 现价',
         cell: (info) => <span className="text-blue-400 font-semibold">{info.getValue().toFixed(6)}</span>
       }),
       columnHelper.accessor('moving_price', {
-        header: 'EMA 价格',
+        header: 'Alpha EMA',
         cell: (info) => <span className="text-purple-400 font-semibold">{info.getValue().toFixed(6)}</span>
       }),
       columnHelper.accessor('root_prop', {
@@ -97,7 +97,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
         cell: (info) => <span>{info.getValue().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       }),
       columnHelper.accessor('total_neuron_em', {
-        header: '神经元排放',
+        header: '神经元排放(TAO)',
         cell: (info) => <span className="font-semibold text-white">{info.getValue().toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
       }),
       columnHelper.accessor('registration_allowed', {
@@ -115,7 +115,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           if (!info.getValue()) {
             return (
               <span className="px-2 py-0.5 text-xs rounded border text-red-400 bg-red-500/10 border-red-500/20 font-medium">
-                未开启
+                注册关闭
               </span>
             );
           }
@@ -197,7 +197,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           <tbody>
             {table.getRowModel().rows.map((row, idx) => {
               const subnet = row.original;
-              const isInactive = subnet.status === '禁止排放';
+              const isInactive = !subnet.enabled;
               return (
                 <tr
                   key={row.id}

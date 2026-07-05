@@ -1,9 +1,10 @@
 import { sendTelegramAlert } from '../services/telegramService.js';
-import { logger } from '../services/logService.js';
+import { formatBeijingTime, logger } from '../services/logService.js';
 
 export function parseBlockEvents(
   events: any[],
-  blockNumber: number
+  blockNumber: number,
+  beijingTime: string = formatBeijingTime()
 ): void {
   for (const record of events) {
     const { event } = record;
@@ -40,8 +41,11 @@ export function parseBlockEvents(
       try {
         const netuid = Number(event.data[0].toString());
         const firstBlock = Number(event.data[1].toString());
+        const logMsg = `子网 ${netuid} 已执行 start_call，设定首次排放区块为 #${firstBlock}`;
+        const alertMsg = `${beijingTime}\n[INFO]\n${logMsg}`;
         
-        logger.info(`子网 ${netuid} 已执行 start_call，设定首次排放区块为 #${firstBlock}`);
+        logger.info(logMsg);
+        sendTelegramAlert(alertMsg, { parseMode: null }).catch(err => console.error('Failed to send Telegram alert:', err));
       } catch (err: any) {
         logger.error(`解析 FirstEmissionBlockNumberSet 事件出错: ${err.message}`);
       }

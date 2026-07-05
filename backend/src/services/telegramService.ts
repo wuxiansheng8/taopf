@@ -1,7 +1,11 @@
 import { getSetting } from './settingsService.js';
 import { logger } from './logService.js';
 
-export async function sendTelegramAlert(message: string): Promise<void> {
+type TelegramAlertOptions = {
+  parseMode?: 'Markdown' | null;
+};
+
+export async function sendTelegramAlert(message: string, options: TelegramAlertOptions = { parseMode: 'Markdown' }): Promise<void> {
   const token = await getSetting('telegram_token');
   const chatId = await getSetting('telegram_chat_id');
   
@@ -9,14 +13,19 @@ export async function sendTelegramAlert(message: string): Promise<void> {
   
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   try {
+    const parseMode = options.parseMode === undefined ? 'Markdown' : options.parseMode;
+    const body: { chat_id: string; text: string; parse_mode?: 'Markdown' } = {
+      chat_id: chatId,
+      text: message
+    };
+    if (parseMode) {
+      body.parse_mode = parseMode;
+    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'Markdown'
-      })
+      body: JSON.stringify(body)
     });
     
     if (!res.ok) {

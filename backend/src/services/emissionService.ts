@@ -1,6 +1,6 @@
 import { getDb } from '../db/connection.js';
 import { SubnetBlockData, BlockEmissionRecord, LiquidationSnapshot } from '../../../shared/types.js';
-import { logger } from './logService.js';
+import { formatBeijingTime, logger } from './logService.js';
 import { EventEmitter } from 'events';
 
 export const blockEmitter = new EventEmitter();
@@ -83,7 +83,7 @@ export async function initEmissionsCache(): Promise<void> {
 
     const latestBNum = blockNumbers[blockNumbers.length - 1];
     const latestRows = await db.all('SELECT * FROM emissions_history WHERE block_number = ?', [latestBNum]);
-    const timeStr = latestRows[0]?.timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const timeStr = latestRows[0]?.timestamp || formatBeijingTime();
     
     CURRENT_BLOCK_DATA = {
       block_number: latestBNum,

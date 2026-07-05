@@ -2,9 +2,6 @@ import { ApiDecoration } from '@polkadot/api/types';
 import { SubnetBlockData } from '../../../shared/types.js';
 import { codecToBoolean, codecToNumber, fixed32ToNumber, RAO_PER_TAO } from './chainValueParser.js';
 
-const NETUIDS = Array.from({ length: 128 }, (_, i) => i + 1);
-const EXPECTED_STORAGE_VALUES = 1 + NETUIDS.length * 9 + 3;
-
 interface DynamicInfoJson {
   netuid: number;
   taoInEmission?: unknown;
@@ -65,19 +62,21 @@ function buildDynamicInfoMap(rawDynamicInfo: any): Map<number, DynamicInfoJson> 
 
 function assertCompleteSnapshot(
   storageValues: any[],
+  netuids: number[],
   dynamicMap: Map<number, DynamicInfoJson>,
   priceMap: Map<number, number>
 ): void {
-  if (storageValues.length !== EXPECTED_STORAGE_VALUES) {
-    throw new Error(`链上批量查询返回数量异常: ${storageValues.length}/${EXPECTED_STORAGE_VALUES}`);
+  const expectedStorageValues = 1 + netuids.length * 9 + 3;
+  if (storageValues.length !== expectedStorageValues) {
+    throw new Error(`链上批量查询返回数量异常: ${storageValues.length}/${expectedStorageValues}`);
   }
 
-  const missingDynamic = NETUIDS.filter((netuid) => !dynamicMap.has(netuid));
+  const missingDynamic = netuids.filter((netuid) => !dynamicMap.has(netuid));
   if (missingDynamic.length > 0) {
     throw new Error(`DynamicInfo 缺少子网: ${missingDynamic.join(',')}`);
   }
 
-  const missingPrices = NETUIDS.filter((netuid) => !priceMap.has(netuid));
+  const missingPrices = netuids.filter((netuid) => !priceMap.has(netuid));
   if (missingPrices.length > 0) {
     throw new Error(`Alpha 价格缺少子网: ${missingPrices.join(',')}`);
   }
@@ -103,24 +102,33 @@ export async function queryBlockEmissionSnapshot(
     liquidationSubnetsRaw: LiquidationSubnetRaw[];
   }
 }> {
+  const rawDynamicInfo = await apiAt.call.subnetInfoRuntimeApi.getAllDynamicInfo();
+  const dynamicMap = buildDynamicInfoMap(rawDynamicInfo);
+  const netuids = Array.from(dynamicMap.keys())
+    .filter((netuid) => netuid > 0)
+    .sort((a, b) => a - b);
+
+  if (netuids.length === 0) {
+    throw new Error('DynamicInfo 未返回任何非 Root 子网');
+  }
+
   const storageCalls: any[] = [
     apiAt.query.system.events,
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetEmissionEnabled, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetExcessTao, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.rootProp, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.minerBurned, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.ownerCutEnabled, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.networkRegistrationAllowed, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetworkN, netuid]),
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.maxAllowedUids, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.subnetEmissionEnabled, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.subnetExcessTao, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.rootProp, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.minerBurned, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.ownerCutEnabled, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.networkRegistrationAllowed, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.subnetworkN, netuid]),
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.maxAllowedUids, netuid]),
     apiAt.query.subtensorModule.subnetOwnerCut,
     apiAt.query.subtensorModule.networkImmunityPeriod,
     apiAt.query.subtensorModule.subnetLimit,
-    ...NETUIDS.map((netuid) => [apiAt.query.subtensorModule.subnetLocked, netuid])
+    ...netuids.map((netuid) => [apiAt.query.subtensorModule.subnetLocked, netuid])
   ];
 
-  const [rawDynamicInfo, rawPrices, rawLockCost, storageValues] = await Promise.all([
-    apiAt.call.subnetInfoRuntimeApi.getAllDynamicInfo(),
+  const [rawPrices, rawLockCost, storageValues] = await Promise.all([
     apiAt.call.swapRuntimeApi.currentAlphaPriceAll(),
     apiAt.call.subnetRegistrationRuntimeApi?.getNetworkRegistrationCost 
       ? apiAt.call.subnetRegistrationRuntimeApi.getNetworkRegistrationCost() 
@@ -130,30 +138,29 @@ export async function queryBlockEmissionSnapshot(
 
   let offset = 0;
   const events = storageValues[offset++] as any[];
-  const enabledValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const excessTaoValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const rootPropValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const minerBurnedValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const ownerCutEnabledValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const registrationAllowedValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const subnetworkNValues = storageValues.slice(offset, offset += NETUIDS.length);
-  const maxAllowedUidsValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const enabledValues = storageValues.slice(offset, offset += netuids.length);
+  const excessTaoValues = storageValues.slice(offset, offset += netuids.length);
+  const rootPropValues = storageValues.slice(offset, offset += netuids.length);
+  const minerBurnedValues = storageValues.slice(offset, offset += netuids.length);
+  const ownerCutEnabledValues = storageValues.slice(offset, offset += netuids.length);
+  const registrationAllowedValues = storageValues.slice(offset, offset += netuids.length);
+  const subnetworkNValues = storageValues.slice(offset, offset += netuids.length);
+  const maxAllowedUidsValues = storageValues.slice(offset, offset += netuids.length);
   
   const globalOwnerCut = storageValues[offset++];
   const networkImmunityPeriod = storageValues[offset++];
   const subnetLimit = storageValues[offset++];
-  const subnetLockedValues = storageValues.slice(offset, offset += NETUIDS.length);
+  const subnetLockedValues = storageValues.slice(offset, offset += netuids.length);
 
-  const dynamicMap = buildDynamicInfoMap(rawDynamicInfo);
   const priceMap = buildPriceMap(rawPrices);
-  assertCompleteSnapshot(storageValues, dynamicMap, priceMap);
+  assertCompleteSnapshot(storageValues, netuids, dynamicMap, priceMap);
   const baseOwnerCut = codecToNumber(globalOwnerCut) / 65535;
 
   const current_lock_cost = rawLockCost ? Number(rawLockCost.toString()) / 1e9 : 0;
 
   const liquidationSubnetsRaw: LiquidationSubnetRaw[] = [];
 
-  const subnetsData = NETUIDS.map((netuid, index): SubnetBlockData => {
+  const subnetsData = netuids.map((netuid, index): SubnetBlockData => {
     const dynamicInfo = dynamicMap.get(netuid);
     const enabled = codecToBoolean(enabledValues[index], true);
     const alpha_out = codecToNumber(dynamicInfo?.alphaOutEmission) / RAO_PER_TAO;

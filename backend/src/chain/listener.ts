@@ -2,7 +2,7 @@ import { getApi } from './api.js';
 import { queryBlockEmissionSnapshot } from './storageReader.js';
 import { parseBlockEvents } from './eventParser.js';
 import { addBlockEmissions } from '../services/emissionService.js';
-import { logger } from '../services/logService.js';
+import { formatBeijingTime, logger } from '../services/logService.js';
 import { updateLiquidationSnapshot } from '../services/liquidationService.js';
 import { LiquidationSubnet, LiquidationSnapshot } from '../../../shared/types.js';
 
@@ -32,11 +32,8 @@ export async function startChainListener(): Promise<void> {
             try {
               const apiAt = await api.at(blockHash);
               const { events, subnetsData, rawLiquidation } = await queryBlockEmissionSnapshot(apiAt);
-              parseBlockEvents(events as any, blockNumber);
-              
-              const now = new Date();
-              const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-              const beijingTime = new Date(utc + (3600000 * 8)).toISOString().replace('T', ' ').substring(0, 19);
+              const beijingTime = formatBeijingTime();
+              parseBlockEvents(events as any, blockNumber, beijingTime);
 
               // Calculate Liquidation snapshot
               const allSubnets: LiquidationSubnet[] = rawLiquidation.liquidationSubnetsRaw.map((sub): LiquidationSubnet => {

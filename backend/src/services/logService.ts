@@ -4,9 +4,27 @@ import EventEmitter from 'events';
 // Custom event emitter to push log updates in real-time to active SSE connections
 export const logEmitter = new EventEmitter();
 
-export async function addLog(level: 'INFO' | 'WARN' | 'ERROR', message: string): Promise<void> {
+const beijingTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+  hourCycle: 'h23'
+});
+
+export function formatBeijingTime(date: Date = new Date()): string {
+  const parts = Object.fromEntries(
+    beijingTimeFormatter.formatToParts(date).map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
+export async function addLog(level: 'INFO' | 'WARN' | 'ERROR', message: string, timestamp = formatBeijingTime()): Promise<void> {
   const db = await getDb();
-  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
   
   await db.run('INSERT INTO system_logs (level, message, timestamp) VALUES (?, ?, ?)', [level, message, timestamp]);
   
@@ -24,7 +42,7 @@ export async function getLogs(levelFilter?: string, limit: number = 200): Promis
 
 export async function pruneOldLogs(): Promise<number> {
   const db = await getDb();
-  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19);
+  const twoDaysAgo = formatBeijingTime(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
   
   const result = await db.run('DELETE FROM system_logs WHERE timestamp < ?', [twoDaysAgo]);
   return result.changes || 0;
@@ -33,16 +51,19 @@ export async function pruneOldLogs(): Promise<number> {
 // Helper logging methods
 export const logger = {
   info: (msg: string) => {
-    console.log(`[INFO] ${msg}`);
-    addLog('INFO', msg).catch(err => console.error('Failed to log to DB:', err));
+    const timestamp = formatBeijingTime();
+    console.log(`${timestamp} [INFO] ${msg}`);
+    addLog('INFO', msg, timestamp).catch(err => console.error('Failed to log to DB:', err));
   },
   warn: (msg: string) => {
-    console.warn(`[WARNING] ${msg}`);
-    addLog('WARN', msg).catch(err => console.error('Failed to log to DB:', err));
+    const timestamp = formatBeijingTime();
+    console.warn(`${timestamp} [WARN] ${msg}`);
+    addLog('WARN', msg, timestamp).catch(err => console.error('Failed to log to DB:', err));
   },
   error: (msg: string) => {
-    console.error(`[ERROR] ${msg}`);
-    addLog('ERROR', msg).catch(err => console.error('Failed to log to DB:', err));
+    const timestamp = formatBeijingTime();
+    console.error(`${timestamp} [ERROR] ${msg}`);
+    addLog('ERROR', msg, timestamp).catch(err => console.error('Failed to log to DB:', err));
   }
 };
 
