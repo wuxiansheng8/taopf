@@ -142,7 +142,8 @@ export default function SettingsPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto pr-2 scrollbar-thin">
+      <div className="space-y-6 pb-8">
       <div className="panel-header">
         <h2 className="text-xl font-bold text-white">⚙️ 系统设置</h2>
       </div>
@@ -344,6 +345,7 @@ export default function SettingsPanel() {
             {saveStatus}
           </span>
         )}
+      </div>
       </div>
     </div>
   );
