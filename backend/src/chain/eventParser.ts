@@ -1,4 +1,5 @@
 import { sendTelegramAlert } from '../services/telegramService.js';
+import { sendFlashdutyAlert } from '../services/flashdutyService.js';
 import { formatBeijingTime, logger } from '../services/logService.js';
 
 export function parseBlockEvents(
@@ -28,6 +29,12 @@ export function parseBlockEvents(
         
         logger.warn(`监测到子网排放状态变更: Subnet ${netuid} 被设置为 ${enabled ? '启用' : '禁用'}`);
         sendTelegramAlert(alertMsg).catch(err => console.error('Failed to send Telegram alert:', err));
+        
+        // 触发 FlashDuty 电话告警
+        const fdTitle = `子网 ${netuid} 排放状态已${enabled ? '启用' : '禁用'}`;
+        const fdDesc = `监测到子网排放状态变更: Subnet ${netuid} 被设置为 ${enabled ? '启用' : '禁用'}，区块高度: #${blockNumber}`;
+        const fdAlertKey = `subnet_${netuid}_emission_${enabled ? 'enabled' : 'disabled'}_${blockNumber}`;
+        sendFlashdutyAlert(fdTitle, fdDesc, fdAlertKey).catch(err => console.error('Failed to send FlashDuty alert:', err));
       } catch (err: any) {
         logger.error(`解析 SubnetEmissionEnabledSet 事件出错: ${err.message}`);
       }

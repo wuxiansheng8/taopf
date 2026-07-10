@@ -14,6 +14,7 @@ interface SubnetsTableProps {
   data: SubnetBlockData[];
   comparison24hData?: SubnetBlockData[];
   showShareTrend?: boolean;
+  searchQuery?: string;
 }
 
 const columnHelper = createColumnHelper<SubnetBlockData>();
@@ -21,7 +22,8 @@ const columnHelper = createColumnHelper<SubnetBlockData>();
 export default function SubnetsTable({ 
   data, 
   comparison24hData = [], 
-  showShareTrend = false 
+  showShareTrend = false,
+  searchQuery = ''
 }: SubnetsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -59,8 +61,7 @@ export default function SubnetsTable({
         cell: (info) => {
           const value = info.getValue();
           const percent = value * 100;
-          const decimals = percent >= 0.01 ? 2 : 4;
-          const displayedString = percent.toFixed(decimals);
+          const displayedString = percent.toFixed(2);
           
           let trendIndicator = null;
           
@@ -70,8 +71,7 @@ export default function SubnetsTable({
             
             if (share24h !== undefined) {
               const percent24h = share24h * 100;
-              const decimals24h = percent24h >= 0.01 ? 2 : 4;
-              const displayedString24h = percent24h.toFixed(decimals24h);
+              const displayedString24h = percent24h.toFixed(2);
               
               const currentRounded = parseFloat(displayedString);
               const rounded24h = parseFloat(displayedString24h);
@@ -262,7 +262,23 @@ export default function SubnetsTable({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row, idx) => {
+            {(() => {
+              const rows = table.getRowModel().rows;
+              const q = searchQuery.trim();
+              if (!q || !/^\d+$/.test(q)) return rows;
+              
+              const targetNetuid = parseInt(q, 10);
+              const matched: typeof rows = [];
+              const others: typeof rows = [];
+              rows.forEach((row) => {
+                if (row.original.netuid === targetNetuid) {
+                  matched.push(row);
+                } else {
+                  others.push(row);
+                }
+              });
+              return [...matched, ...others];
+            })().map((row, displayIdx) => {
               const subnet = row.original;
               const isInactive = !subnet.enabled;
               return (
@@ -273,7 +289,7 @@ export default function SubnetsTable({
                   }`}
                 >
                   <td className="px-4 py-3 align-middle text-gray-500 font-mono text-left">
-                    {idx + 1}
+                    {displayIdx + 1}
                   </td>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-3 align-middle text-left">

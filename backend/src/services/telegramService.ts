@@ -8,32 +8,40 @@ type TelegramAlertOptions = {
 export async function sendTelegramAlert(message: string, options: TelegramAlertOptions = { parseMode: 'Markdown' }): Promise<void> {
   const token = await getSetting('telegram_token');
   const chatId = await getSetting('telegram_chat_id');
+  const tokenBackup = await getSetting('telegram_token_backup');
+  const chatIdBackup = await getSetting('telegram_chat_id_backup');
   
-  if (!token || !chatId) return;
+  const sends = [];
+  if (token && chatId) {
+    sends.push(sendSingleTelegram(token, chatId, message, options));
+  }
+  if (tokenBackup && chatIdBackup) {
+    sends.push(sendSingleTelegram(tokenBackup, chatIdBackup, message, options));
+  }
   
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  try {
-    const parseMode = options.parseMode === undefined ? 'Markdown' : options.parseMode;
-    const body: { chat_id: string; text: string; parse_mode?: 'Markdown' } = {
-      chat_id: chatId,
-      text: message
-    };
-    if (parseMode) {
-      body.parse_mode = parseMode;
-    }
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+  if (sends.length > 0) {
+    await Promise.all(sends).catch(err => {
+      logger.error(`双通道警报发送失败: ${err.message || String(err)}`);
     });
-    
-    if (!res.ok) {
-      const errText = await res.text();
-      logger.error(`Telegram 发送失败: ${errText}`);
-    }
-  } catch (err: any) {
-    logger.error(`Telegram 连接出错: ${err.message}`);
+  }
+}
+
+async function sendSingleTelegram(token: string, chatId: string, message: string, options: TelegramAlertOptions): Promise<void> {
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const parseMode = options.parseMode === undefined ? 'Markdown' : options.parseMode;
+  const body: any = { chat_id: chatId, text: message };
+  if (parseMode) {
+    body.parse_mode = parseMode;
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Bot (${chatId}) 失败: ${errText}`);
   }
 }
 

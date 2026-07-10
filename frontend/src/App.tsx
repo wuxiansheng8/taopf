@@ -13,6 +13,7 @@ export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('taopf_token'));
   const [activeTab, setActiveTab] = useState<'dashboard' | 'liquidation' | 'logs' | 'settings'>('dashboard');
   const [dataMode, setDataMode] = useState<'current' | '24h'>('current');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Stats State
   const [lastSuccessBlock, setLastSuccessBlock] = useState(0);
@@ -221,23 +222,32 @@ export default function App() {
             <div className="flex flex-col h-full overflow-hidden space-y-3">
               {/* Dashboard Controls */}
               <div className="flex justify-between items-center flex-shrink-0">
-                <div className="p-1 glass-card flex gap-1">
-                  <button
-                    onClick={() => handleToggleMode('current')}
-                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                      dataMode === 'current' ? 'bg-white/5 text-white' : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    当前区块
-                  </button>
-                  <button
-                    onClick={() => handleToggleMode('24h')}
-                    className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                      dataMode === '24h' ? 'bg-white/5 text-white' : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    24H 排放统计
-                  </button>
+                <div className="flex items-center gap-3">
+                  <div className="p-1 glass-card flex gap-1">
+                    <button
+                      onClick={() => handleToggleMode('current')}
+                      className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                        dataMode === 'current' ? 'bg-white/5 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      当前区块
+                    </button>
+                    <button
+                      onClick={() => handleToggleMode('24h')}
+                      className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                        dataMode === '24h' ? 'bg-white/5 text-white' : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      24H 排放统计
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="🔍 输入子网 ID 置顶..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs placeholder-gray-500 focus:outline-none focus:border-blue-500 w-36 ml-2"
+                  />
                 </div>
 
                 <div className="flex items-center gap-6 text-xs text-accentBlue font-semibold">
@@ -253,6 +263,7 @@ export default function App() {
                   data={subnetsData} 
                   comparison24hData={comparison24hData}
                   showShareTrend={dataMode === 'current'}
+                  searchQuery={searchQuery}
                 />
               </div>
             </div>

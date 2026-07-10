@@ -5,6 +5,11 @@ export default function SettingsPanel() {
   const [rpcEndpoints, setRpcEndpoints] = useState('');
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramTokenBackup, setTelegramTokenBackup] = useState('');
+  const [telegramChatIdBackup, setTelegramChatIdBackup] = useState('');
+  const [flashdutyEnabled, setFlashdutyEnabled] = useState(false);
+  const [flashdutyWebhook, setFlashdutyWebhook] = useState('');
+  const [flashdutyCooldown, setFlashdutyCooldown] = useState('300');
 
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -12,6 +17,8 @@ export default function SettingsPanel() {
   const [rpcTestLevel, setRpcTestLevel] = useState<'idle' | 'success' | 'warning' | 'error'>('idle');
   const [rpcTestResults, setRpcTestResults] = useState<any[]>([]);
   const [tgTestStatus, setTgTestStatus] = useState('');
+  const [tgBackupTestStatus, setTgBackupTestStatus] = useState('');
+  const [fdTestStatus, setFdTestStatus] = useState('');
 
   const parseRpcEndpoints = (value: string) => {
     const seen = new Set<string>();
@@ -34,8 +41,13 @@ export default function SettingsPanel() {
       try {
         const res = await client.get('/api/settings');
         setRpcEndpoints(normalizeRpcEndpoints(res.data.rpc_endpoints || ''));
-        setTelegramToken(res.data.telegram_token);
-        setTelegramChatId(res.data.telegram_chat_id);
+        setTelegramToken(res.data.telegram_token || '');
+        setTelegramChatId(res.data.telegram_chat_id || '');
+        setTelegramTokenBackup(res.data.telegram_token_backup || '');
+        setTelegramChatIdBackup(res.data.telegram_chat_id_backup || '');
+        setFlashdutyEnabled(res.data.flashduty_enabled || false);
+        setFlashdutyWebhook(res.data.flashduty_webhook || '');
+        setFlashdutyCooldown(res.data.flashduty_cooldown || '300');
       } catch (err) {
         console.error('Failed to load settings:', err);
       }
@@ -52,7 +64,12 @@ export default function SettingsPanel() {
       await client.post('/api/settings', {
         rpc_endpoints: normalizedRpcEndpoints,
         telegram_token: telegramToken,
-        telegram_chat_id: telegramChatId
+        telegram_chat_id: telegramChatId,
+        telegram_token_backup: telegramTokenBackup,
+        telegram_chat_id_backup: telegramChatIdBackup,
+        flashduty_enabled: flashdutyEnabled,
+        flashduty_webhook: flashdutyWebhook,
+        flashduty_cooldown: flashdutyCooldown
       });
       setSaveStatus('✅ 配置保存成功！');
     } catch (err: any) {
@@ -98,9 +115,29 @@ export default function SettingsPanel() {
     setTgTestStatus('发送测试推送中...');
     try {
       await client.post('/api/test-telegram', { token: telegramToken, chat_id: telegramChatId });
-      setTgTestStatus('✅ 发送成功，请前往 Telegram 确认！');
+      setTgTestStatus('✅ 主机器人发送成功，请前往 Telegram 确认！');
     } catch (err: any) {
       setTgTestStatus(`❌ 发送失败: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
+  const handleTestTgBackup = async () => {
+    setTgBackupTestStatus('发送测试推送中...');
+    try {
+      await client.post('/api/test-telegram', { token: telegramTokenBackup, chat_id: telegramChatIdBackup });
+      setTgBackupTestStatus('✅ 备用机器人发送成功，请前往 Telegram 确认！');
+    } catch (err: any) {
+      setTgBackupTestStatus(`❌ 发送失败: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
+  const handleTestFlashDuty = async () => {
+    setFdTestStatus('发送测试电话告警中...');
+    try {
+      await client.post('/api/test-flashduty', { webhook: flashdutyWebhook });
+      setFdTestStatus('✅ 发送成功，请前往 FlashDuty 确认！');
+    } catch (err: any) {
+      setFdTestStatus(`❌ 发送失败: ${err.response?.data?.detail || err.message}`);
     }
   };
 
@@ -186,17 +223,108 @@ export default function SettingsPanel() {
                 onChange={(e) => setTelegramChatId(e.target.value)}
               />
             </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleTestTg}
+                className="w-fit px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold transition border border-white/10"
+              >
+                🔔 测试主机器人告警
+              </button>
+              {tgTestStatus && (
+                <span className={`text-xs ${tgTestStatus.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                  {tgTestStatus}
+                </span>
+              )}
+            </div>
+
+            <div className="border-t border-white/5 pt-3 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs text-gray-400">Telegram Bot Token (备用)</label>
+                <input
+                  type="password"
+                  className="glass-input w-full px-4 py-2.5 text-xs"
+                  placeholder="请输入备用 API Token"
+                  value={telegramTokenBackup}
+                  onChange={(e) => setTelegramTokenBackup(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-gray-400">Telegram Chat ID (备用)</label>
+                <input
+                  type="text"
+                  className="glass-input w-full px-4 py-2.5 text-xs"
+                  placeholder="请输入备用 Chat/Channel ID"
+                  value={telegramChatIdBackup}
+                  onChange={(e) => setTelegramChatIdBackup(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleTestTgBackup}
+                className="w-fit px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold transition border border-white/10"
+              >
+                🔔 测试备用机器人告警
+              </button>
+              {tgBackupTestStatus && (
+                <span className={`text-xs ${tgBackupTestStatus.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                  {tgBackupTestStatus}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        {/* FlashDuty Alerts */}
+        <div className="glass-card p-6 space-y-6 md:col-span-2">
+          <h3 className="text-sm font-bold text-white border-b border-white/5 pb-2">📞 FlashDuty 电话告警推送</h3>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="fd-enabled"
+              className="rounded bg-white/5 border border-white/10 text-blue-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+              checked={flashdutyEnabled}
+              onChange={(e) => setFlashdutyEnabled(e.target.checked)}
+            />
+            <label htmlFor="fd-enabled" className="text-xs text-gray-300 font-semibold cursor-pointer select-none">
+              启用 FlashDuty 电话告警
+            </label>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-400">FlashDuty Webhook 地址</label>
+              <input
+                type="text"
+                className="glass-input w-full px-4 py-2.5 text-xs font-mono"
+                placeholder="https://api.flashcat.cloud/event/push/alert/standard?integration_key=..."
+                value={flashdutyWebhook}
+                onChange={(e) => setFlashdutyWebhook(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-400">全局告警冷却时间 (秒，默认 300 即 5 分钟)</label>
+              <input
+                type="number"
+                min="0"
+                className="glass-input w-full px-4 py-2.5 text-xs"
+                placeholder="300"
+                value={flashdutyCooldown}
+                onChange={(e) => setFlashdutyCooldown(e.target.value)}
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-2">
             <button
-              onClick={handleTestTg}
+              onClick={handleTestFlashDuty}
               className="w-fit px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold transition border border-white/10"
             >
-              🔔 发送一条测试警报
+              📞 发送 FlashDuty 测试电话告警
             </button>
-            {tgTestStatus && (
-              <span className={`text-xs ${tgTestStatus.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>
-                {tgTestStatus}
+            {fdTestStatus && (
+              <span className={`text-xs ${fdTestStatus.startsWith('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                {fdTestStatus}
               </span>
             )}
           </div>
