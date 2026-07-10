@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,12 +12,27 @@ import { SubnetBlockData } from '../../../shared/types.ts';
 
 interface SubnetsTableProps {
   data: SubnetBlockData[];
+  comparison24hData?: SubnetBlockData[];
+  showShareTrend?: boolean;
 }
 
 const columnHelper = createColumnHelper<SubnetBlockData>();
 
-export default function SubnetsTable({ data }: SubnetsTableProps) {
+export default function SubnetsTable({ 
+  data, 
+  comparison24hData = [], 
+  showShareTrend = false 
+}: SubnetsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
+
+  // 将 24H 排放数据转化为 Map 方便 O(1) 匹配
+  const comparisonMap = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const item of comparison24hData) {
+      map.set(item.netuid, item.emission_share);
+    }
+    return map;
+  }, [comparison24hData]);
 
   const columns = useMemo(
     () => [
@@ -44,10 +60,61 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
           const value = info.getValue();
           const percent = value * 100;
           const decimals = percent >= 0.01 ? 2 : 4;
+          const displayedString = percent.toFixed(decimals);
+          
+          let trendIndicator = null;
+          
+          if (showShareTrend && comparisonMap.size > 0) {
+            const netuid = info.row.original.netuid;
+            const share24h = comparisonMap.get(netuid);
+            
+            if (share24h !== undefined) {
+              const percent24h = share24h * 100;
+              const decimals24h = percent24h >= 0.01 ? 2 : 4;
+              const displayedString24h = percent24h.toFixed(decimals24h);
+              
+              const currentRounded = parseFloat(displayedString);
+              const rounded24h = parseFloat(displayedString24h);
+              const tooltipText = `24H 平均占比: ${displayedString24h}%`;
+              
+              if (currentRounded > rounded24h) {
+                trendIndicator = (
+                  <span 
+                    className="inline-flex items-center justify-center p-1 rounded bg-green-500/10 text-green-400 border border-green-500/20"
+                    title={tooltipText}
+                  >
+                    <TrendingUp size={12} className="stroke-[2.5]" />
+                  </span>
+                );
+              } else if (currentRounded < rounded24h) {
+                trendIndicator = (
+                  <span 
+                    className="inline-flex items-center justify-center p-1 rounded bg-red-500/10 text-red-400 border border-red-500/20"
+                    title={tooltipText}
+                  >
+                    <TrendingDown size={12} className="stroke-[2.5]" />
+                  </span>
+                );
+              } else {
+                trendIndicator = (
+                  <span 
+                    className="inline-flex items-center justify-center p-1 rounded bg-amber-500/5 text-amber-400 border border-amber-500/10"
+                    title={tooltipText}
+                  >
+                    <Minus size={12} className="stroke-[2.5]" />
+                  </span>
+                );
+              }
+            }
+          }
+
           return (
-            <span className="font-semibold text-cyan-300">
-              {percent.toFixed(decimals)}%
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-cyan-300">
+                {displayedString}%
+              </span>
+              {trendIndicator}
+            </div>
           );
         }
       }),
@@ -128,7 +195,7 @@ export default function SubnetsTable({ data }: SubnetsTableProps) {
         }
       })
     ],
-    []
+    [comparisonMap, showShareTrend]
   );
 
   const table = useReactTable({

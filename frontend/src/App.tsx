@@ -21,6 +21,7 @@ export default function App() {
   const [uptimeSeconds, setUptimeSeconds] = useState(0);
   const [subnetsData, setSubnetsData] = useState<SubnetBlockData[]>([]);
   const [liquidationSnapshot, setLiquidationSnapshot] = useState<LiquidationSnapshot | null>(null);
+  const [comparison24hData, setComparison24hData] = useState<SubnetBlockData[]>([]);
 
   // Logs stream
   const [realtimeLogs, setRealtimeLogs] = useState<LogItem[]>([]);
@@ -46,6 +47,9 @@ export default function App() {
         setLatestChainBlock((prev) => Math.max(prev, res.data.block_number));
         setBeijingTime(res.data.beijing_time);
         setSubnetsData(res.data.subnets || []);
+        client.get('/api/emissions/24h')
+          .then(r => setComparison24hData(r.data || []))
+          .catch(err => console.error('Failed to load comparison data', err));
       } else {
         setSubnetsData(res.data || []);
       }
@@ -95,6 +99,9 @@ export default function App() {
       if (activeTab === 'dashboard') {
         if (dataMode === 'current') {
           setSubnetsData(data.subnets || []);
+          client.get('/api/emissions/24h')
+            .then(r => setComparison24hData(r.data || []))
+            .catch(err => console.error('Failed to refresh comparison data', err));
         } else {
           // In 24h mode, pull latest rolling stats
           fetchData();
@@ -242,7 +249,11 @@ export default function App() {
 
               {/* Subnets list */}
               <div className="flex-grow overflow-hidden">
-                <SubnetsTable data={subnetsData} />
+                <SubnetsTable 
+                  data={subnetsData} 
+                  comparison24hData={comparison24hData}
+                  showShareTrend={dataMode === 'current'}
+                />
               </div>
             </div>
           )}
