@@ -33,6 +33,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     const flashduty_enabled = await getSetting('flashduty_enabled', 'false');
     const flashduty_webhook = await getSetting('flashduty_webhook', '');
     const flashduty_cooldown = await getSetting('flashduty_cooldown', '300');
+    const burn_rate_monitor_enabled = await getSetting('burn_rate_monitor_enabled', 'false');
     
     return {
       rpc_endpoints,
@@ -42,7 +43,8 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       telegram_chat_id_backup,
       flashduty_enabled: flashduty_enabled === 'true',
       flashduty_webhook,
-      flashduty_cooldown
+      flashduty_cooldown,
+      burn_rate_monitor_enabled: burn_rate_monitor_enabled === 'true'
     };
   });
 
@@ -57,7 +59,8 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       telegram_chat_id_backup,
       flashduty_enabled,
       flashduty_webhook,
-      flashduty_cooldown
+      flashduty_cooldown,
+      burn_rate_monitor_enabled
     } = request.body as any;
     
     const oldEndpoints = await getSetting('rpc_endpoints', 'wss://entrypoint-finney.opentensor.ai:443');
@@ -76,6 +79,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     await setSetting('flashduty_enabled', flashduty_enabled ? 'true' : 'false');
     await setSetting('flashduty_webhook', flashduty_webhook || '');
     await setSetting('flashduty_cooldown', String(cooldownNum));
+    await setSetting('burn_rate_monitor_enabled', burn_rate_monitor_enabled ? 'true' : 'false');
     
     if (normalizedRpcEndpoints !== normalizeRpcEndpoints(oldEndpoints)) {
       await disconnectApi();

@@ -5,6 +5,24 @@ type TelegramAlertOptions = {
   parseMode?: 'Markdown' | null;
 };
 
+const TELEGRAM_REQUEST_TIMEOUT_MS = 10000;
+
+async function fetchTelegram(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TELEGRAM_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err: any) {
+    if (controller.signal.aborted) {
+      throw new Error(`Telegram 请求超时 (${TELEGRAM_REQUEST_TIMEOUT_MS / 1000}s)`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function sendTelegramAlert(message: string, options: TelegramAlertOptions = { parseMode: 'Markdown' }): Promise<void> {
   const token = await getSetting('telegram_token');
   const chatId = await getSetting('telegram_chat_id');
@@ -34,7 +52,7 @@ async function sendSingleTelegram(token: string, chatId: string, message: string
     body.parse_mode = parseMode;
   }
 
-  const res = await fetch(url, {
+  const res = await fetchTelegram(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -52,7 +70,7 @@ export async function testTelegramBot(token: string, chatId: string): Promise<{ 
   
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchTelegram(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

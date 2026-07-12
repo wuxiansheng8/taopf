@@ -10,6 +10,7 @@ export default function SettingsPanel() {
   const [flashdutyEnabled, setFlashdutyEnabled] = useState(false);
   const [flashdutyWebhook, setFlashdutyWebhook] = useState('');
   const [flashdutyCooldown, setFlashdutyCooldown] = useState('300');
+  const [burnRateMonitorEnabled, setBurnRateMonitorEnabled] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -48,6 +49,7 @@ export default function SettingsPanel() {
         setFlashdutyEnabled(res.data.flashduty_enabled || false);
         setFlashdutyWebhook(res.data.flashduty_webhook || '');
         setFlashdutyCooldown(res.data.flashduty_cooldown || '300');
+        setBurnRateMonitorEnabled(res.data.burn_rate_monitor_enabled || false);
       } catch (err) {
         console.error('Failed to load settings:', err);
       }
@@ -69,7 +71,8 @@ export default function SettingsPanel() {
         telegram_chat_id_backup: telegramChatIdBackup,
         flashduty_enabled: flashdutyEnabled,
         flashduty_webhook: flashdutyWebhook,
-        flashduty_cooldown: flashdutyCooldown
+        flashduty_cooldown: flashdutyCooldown,
+        burn_rate_monitor_enabled: burnRateMonitorEnabled
       });
       setSaveStatus('✅ 配置保存成功！');
     } catch (err: any) {
@@ -272,6 +275,26 @@ export default function SettingsPanel() {
                   {tgBackupTestStatus}
                 </span>
               )}
+            </div>
+
+            <div className="border-t border-white/5 pt-4 flex items-center justify-between">
+              <span className="text-xs text-gray-300 font-semibold select-none">燃烧率监控</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={burnRateMonitorEnabled}
+                aria-label="燃烧率监控"
+                onClick={() => setBurnRateMonitorEnabled((enabled) => !enabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center cursor-pointer rounded-full border border-white/10 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                  burnRateMonitorEnabled ? 'bg-blue-600' : 'bg-white/10'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                    burnRateMonitorEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </div>

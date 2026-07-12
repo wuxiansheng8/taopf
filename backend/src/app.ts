@@ -9,6 +9,7 @@ import { getDb } from './db/connection.js';
 import { initEmissionsCache } from './services/emissionService.js';
 import { startLogPruner, logger } from './services/logService.js';
 import { startChainListener } from './chain/listener.js';
+import { initBurnRateMonitor } from './services/burnRateMonitorService.js';
 
 // Import local routes
 import { authRoutes } from './routes/auth.js';
@@ -56,6 +57,9 @@ const start = async () => {
     
     // 3. Populate memory emissions cache
     await initEmissionsCache();
+
+    // 3.5 Register optional burn-rate monitoring
+    initBurnRateMonitor();
     
     // 4. Start blockchain subscriber
     startChainListener().catch(err => {
