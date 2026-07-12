@@ -17,6 +17,7 @@ type BurnRateChange = {
 };
 
 const TELEGRAM_MESSAGE_LIMIT = 4000;
+const MIN_BURN_RATE_CHANGE_PERCENTAGE_POINTS = 1;
 
 let lastBurnRates = new Map<number, number>();
 let wasEnabled = false;
@@ -52,7 +53,11 @@ function findChanges(currentRates: Map<number, number>): BurnRateChange[] {
 
   for (const [netuid, current] of currentRates) {
     const previous = lastBurnRates.get(netuid);
-    if (previous !== undefined && previous !== current) {
+    const changePercentagePoints = previous === undefined
+      ? 0
+      : Math.abs(current - previous) * 100;
+
+    if (previous !== undefined && changePercentagePoints >= MIN_BURN_RATE_CHANGE_PERCENTAGE_POINTS) {
       changes.push({ netuid, previous, current });
     }
   }
