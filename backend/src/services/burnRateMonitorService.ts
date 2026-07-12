@@ -17,7 +17,7 @@ type BurnRateChange = {
 };
 
 const TELEGRAM_MESSAGE_LIMIT = 4000;
-const MIN_BURN_RATE_CHANGE_PERCENTAGE_POINTS = 1;
+const MIN_BURN_RATE_CHANGE_PERCENTAGE_POINTS = 5;
 
 let lastBurnRates = new Map<number, number>();
 let wasEnabled = false;
