@@ -5,13 +5,14 @@ import SubnetsTable from './components/SubnetsTable.tsx';
 import LogsPanel, { LogItem } from './components/LogsPanel.tsx';
 import SettingsPanel from './components/SettingsPanel.tsx';
 import LiquidationPanel from './components/LiquidationPanel.tsx';
+import StakeFlowPanel from './components/StakeFlowPanel.tsx';
 import client from './api/client.ts';
 import { SubnetBlockData, LiquidationSnapshot } from '../../shared/types.ts';
-import { Activity, Terminal, Settings, Lock, TrendingDown } from 'lucide-react';
+import { Activity, ArrowLeftRight, Terminal, Settings, Lock, TrendingDown } from 'lucide-react';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('taopf_token'));
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'liquidation' | 'logs' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'liquidation' | 'stake-flow' | 'logs' | 'settings'>('dashboard');
   const [dataMode, setDataMode] = useState<'current' | '24h'>('current');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -171,6 +172,18 @@ export default function App() {
             <TrendingDown size={16} />
             <span>子网清算</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('stake-flow')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+              activeTab === 'stake-flow'
+                ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <ArrowLeftRight size={16} />
+            <span>每日质押流向</span>
+          </button>
           
           <button
             onClick={() => setActiveTab('logs')}
@@ -272,6 +285,8 @@ export default function App() {
           {activeTab === 'liquidation' && (
             <LiquidationPanel snapshot={liquidationSnapshot} />
           )}
+
+          {activeTab === 'stake-flow' && <StakeFlowPanel />}
 
           {activeTab === 'logs' && <LogsPanel realtimeLogs={realtimeLogs} />}
 

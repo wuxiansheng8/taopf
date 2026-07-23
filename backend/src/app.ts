@@ -16,6 +16,7 @@ import { authRoutes } from './routes/auth.js';
 import { overviewRoutes } from './routes/overview.js';
 import { settingsRoutes } from './routes/settings.js';
 import { logsRoutes } from './routes/logs.js';
+import { stakeFlowRoutes } from './routes/stakeFlow.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,7 @@ await fastify.register(authRoutes);
 await fastify.register(overviewRoutes);
 await fastify.register(settingsRoutes);
 await fastify.register(logsRoutes);
+await fastify.register(stakeFlowRoutes);
 
 // Serve frontend build files
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');

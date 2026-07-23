@@ -1,9 +1,11 @@
 import { getApi } from './api.js';
 import { queryBlockEmissionSnapshot } from './storageReader.js';
 import { parseBlockEvents } from './eventParser.js';
+import { parseStakeFlowEvents } from './stakeFlowEventParser.js';
 import { addBlockEmissions } from '../services/emissionService.js';
 import { formatBeijingTime, logger } from '../services/logService.js';
 import { updateLiquidationSnapshot } from '../services/liquidationService.js';
+import { recordStakeFlowBlock } from '../services/stakeFlowService.js';
 import { LiquidationSubnet, LiquidationSnapshot } from '../../../shared/types.js';
 
 let isListening = false;
@@ -31,9 +33,16 @@ export async function startChainListener(): Promise<void> {
           processingQueue = processingQueue.then(async () => {
             try {
               const apiAt = await api.at(blockHash);
-              const { events, subnetsData, rawLiquidation } = await queryBlockEmissionSnapshot(apiAt);
-              const beijingTime = formatBeijingTime();
+              const [rawTimestamp, snapshot] = await Promise.all([
+                apiAt.query.timestamp.now(),
+                queryBlockEmissionSnapshot(apiAt)
+              ]);
+              const blockTimestampMs = Number(rawTimestamp.toString());
+              const { events, subnetsData, rawLiquidation } = snapshot;
+              const beijingTime = formatBeijingTime(new Date(blockTimestampMs));
               parseBlockEvents(events as any, blockNumber, beijingTime);
+              const stakeEvents = parseStakeFlowEvents(events as any, blockNumber);
+              await recordStakeFlowBlock(stakeEvents, blockTimestampMs);
 
               // Calculate Liquidation snapshot
               const allSubnets: LiquidationSubnet[] = rawLiquidation.liquidationSubnetsRaw.map((sub): LiquidationSubnet => {

@@ -51,3 +51,25 @@ export interface LiquidationSnapshot {
   immune_subnets: LiquidationSubnet[];
 }
 
+export interface SubnetStakeFlowData {
+  netuid: number;
+  stake_amount: number;
+  unstake_amount: number;
+  net_inflow: number;
+  tx_count: number;
+}
+
+export interface StakeFlowCycleSummary {
+  cycle: {
+    date_key: string;
+    start_time: string;
+    end_time: string;
+  };
+  summary: {
+    today_stake: number;
+    today_unstake: number;
+    today_net_inflow: number;
+    yesterday_net_inflow: number | null;
+  };
+  subnets: SubnetStakeFlowData[];
+}
