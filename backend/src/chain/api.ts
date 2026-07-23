@@ -3,6 +3,52 @@ import { getSetting } from '../services/settingsService.js';
 import { logger } from '../services/logService.js';
 import { parseRpcEndpoints } from '../utils/rpcEndpoints.js';
 
+const customRuntimeApis = {
+  SubnetInfoRuntimeApi: [
+    {
+      methods: {
+        get_all_dynamic_info: {
+          description: 'Get all dynamic info',
+          params: [],
+          type: 'Vec<Option<DynamicInfo>>'
+        },
+        get_dynamic_info: {
+          description: 'Get dynamic info for a subnet',
+          params: [
+            { name: 'netuid', type: 'u16' }
+          ],
+          type: 'Option<DynamicInfo>'
+        }
+      },
+      version: 1
+    }
+  ],
+  SwapRuntimeApi: [
+    {
+      methods: {
+        current_alpha_price_all: {
+          description: 'Get all alpha prices',
+          params: [],
+          type: 'Vec<SubnetPrice>'
+        }
+      },
+      version: 1
+    }
+  ],
+  SubnetRegistrationRuntimeApi: [
+    {
+      methods: {
+        get_network_registration_cost: {
+          description: 'Get network registration cost',
+          params: [],
+          type: 'u64'
+        }
+      },
+      version: 1
+    }
+  ]
+};
+
 let apiPromise: ApiPromise | null = null;
 let currentProvider: WsProvider | null = null;
 
@@ -42,7 +88,11 @@ export async function getApi(): Promise<ApiPromise> {
   logger.info(`正在初始化 Subtensor RPC 连接，可用节点列表: ${urls.join(', ')}...`);
   
   currentProvider = new WsProvider(urls);
-  apiPromise = new ApiPromise({ provider: currentProvider });
+  apiPromise = new ApiPromise({ 
+    provider: currentProvider,
+    runtime: customRuntimeApis
+  });
+
   
   currentProvider.on('connected', () => logger.info('与 Subtensor RPC 节点的连接已建立。'));
   currentProvider.on('disconnected', () => logger.warn('与 Subtensor RPC 节点的连接断开，正在尝试重连/切换备用节点...'));
@@ -58,7 +108,10 @@ export async function testRpc(endpoint: string): Promise<{ success: boolean; lat
   let api: ApiPromise | null = null;
   try {
     provider = new WsProvider(endpoint);
-    api = new ApiPromise({ provider });
+    api = new ApiPromise({ 
+      provider,
+      runtime: customRuntimeApis
+    });
     await withTimeout(api.isReady, 10000, '连接超时');
     
     // Test runtime version
