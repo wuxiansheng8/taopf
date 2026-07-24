@@ -1,5 +1,4 @@
-import React from 'react';
-import { LiquidationSnapshot, LiquidationSubnet } from '../../../shared/types.ts';
+import { LiquidationSnapshot } from '../../../shared/types.ts';
 import { Shield, ShieldAlert, Cpu, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 
 interface LiquidationPanelProps {

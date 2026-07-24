@@ -17,6 +17,8 @@ export interface SubnetBlockData {
   registration_allowed: boolean;
   subnetwork_n: number;
   max_allowed_uids: number;
+  subnet_name?: string;
+  owner_cut?: number;
 }
 
 export interface BlockEmissionRecord {
@@ -72,4 +74,33 @@ export interface StakeFlowCycleSummary {
     yesterday_net_inflow: number | null;
   };
   subnets: SubnetStakeFlowData[];
+}
+
+export interface MinerCompetitionSubnet {
+  netuid: number;
+  subnet_name: string;
+  registration_allowed: boolean;
+  miner_burn_cost: number;
+  uid_immunity_period: number;
+  miner_burned: number;
+  subnetwork_n: number;
+  max_allowed_uids: number;
+  active_uids: number;
+  rewarded_uids: number;
+  miner_emission_pool_tao_24h: number;
+  daily_tao_per_uid: number;
+  top10_incentive_share: number;
+  reg_count_24h: number;
+  replace_count_24h: number | null;
+  turnover_rate_24h: number | null;
+  emission_trend_percent: number | null;
+  payback_days: number | null;
+}
+
+export interface MinerCompetitionSnapshot {
+  block_number: number;
+  beijing_time: string;
+  observed_blocks_24h: number;
+  history_coverage_ratio: number;
+  subnets: MinerCompetitionSubnet[];
 }

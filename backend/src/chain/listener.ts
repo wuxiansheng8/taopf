@@ -2,10 +2,13 @@ import { getApi } from './api.js';
 import { queryBlockEmissionSnapshot } from './storageReader.js';
 import { parseBlockEvents } from './eventParser.js';
 import { parseStakeFlowEvents } from './stakeFlowEventParser.js';
-import { addBlockEmissions } from '../services/emissionService.js';
+import { addBlockEmissions, getCurrentBlockEmissions } from '../services/emissionService.js';
 import { formatBeijingTime, logger } from '../services/logService.js';
 import { updateLiquidationSnapshot } from '../services/liquidationService.js';
 import { recordStakeFlowBlock } from '../services/stakeFlowService.js';
+import { parseMinerRegEvents } from './minerEventParser.js';
+import { queryMinerCompetitionState } from './minerCompetitionReader.js';
+import { recordMinerCompetitionBlock } from '../services/minerCompetitionService.js';
 import { LiquidationSubnet, LiquidationSnapshot } from '../../../shared/types.js';
 
 let isListening = false;
@@ -22,6 +25,7 @@ export async function startChainListener(): Promise<void> {
         const api = await getApi();
         let blockLatencies: number[] = [];
         let processingQueue = Promise.resolve();
+        let minerProcessingQueue = Promise.resolve();
 
         // Subscribe to block heads
         const unsubscribe = await api.rpc.chain.subscribeNewHeads((header) => {
@@ -39,9 +43,14 @@ export async function startChainListener(): Promise<void> {
               ]);
               const blockTimestampMs = Number(rawTimestamp.toString());
               const { events, subnetsData, rawLiquidation } = snapshot;
+              const previousEmissions = getCurrentBlockEmissions();
               const beijingTime = formatBeijingTime(new Date(blockTimestampMs));
               parseBlockEvents(events as any, blockNumber, beijingTime);
               const stakeEvents = parseStakeFlowEvents(events as any, blockNumber);
+
+              // Wait for the previous miner task before starting another SQLite transaction.
+              await minerProcessingQueue;
+
               await recordStakeFlowBlock(stakeEvents, blockTimestampMs);
 
               // Calculate Liquidation snapshot
@@ -97,6 +106,32 @@ export async function startChainListener(): Promise<void> {
               updateLiquidationSnapshot(liquidationSnapshot);
 
               await addBlockEmissions(blockNumber, beijingTime, subnetsData, liquidationSnapshot);
+
+              if (blockNumber > previousEmissions.block_number) {
+                const isContiguous = previousEmissions.block_number > 0
+                  && blockNumber === previousEmissions.block_number + 1;
+                const previousSubnetworkN = isContiguous
+                  ? new Map(previousEmissions.subnets.map(subnet => [subnet.netuid, subnet.subnetwork_n]))
+                  : null;
+                const minerEvents = parseMinerRegEvents(events as any, blockNumber);
+
+                minerProcessingQueue = minerProcessingQueue.then(async () => {
+                  const chainState = await queryMinerCompetitionState(
+                    apiAt,
+                    subnetsData.map(subnet => subnet.netuid)
+                  );
+                  await recordMinerCompetitionBlock({
+                    blockNumber,
+                    blockTimestampMs,
+                    events: minerEvents,
+                    subnets: subnetsData,
+                    chainState,
+                    previousSubnetworkN
+                  });
+                }).catch((err: any) => {
+                  logger.error(`矿工竞争模块处理区块 #${blockNumber} 失败: ${err.message || String(err)}`);
+                });
+              }
 
               blockLatencies.push(Date.now() - t0);
               if (blockLatencies.length >= 100) {

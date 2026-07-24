@@ -17,6 +17,7 @@ import { overviewRoutes } from './routes/overview.js';
 import { settingsRoutes } from './routes/settings.js';
 import { logsRoutes } from './routes/logs.js';
 import { stakeFlowRoutes } from './routes/stakeFlow.js';
+import minerCompetitionRoutes from './routes/minerCompetition.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +36,7 @@ await fastify.register(overviewRoutes);
 await fastify.register(settingsRoutes);
 await fastify.register(logsRoutes);
 await fastify.register(stakeFlowRoutes);
+await fastify.register(minerCompetitionRoutes);
 
 // Serve frontend build files
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');

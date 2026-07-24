@@ -156,7 +156,7 @@ export async function queryBlockEmissionSnapshot(
   assertCompleteSnapshot(storageValues, netuids, dynamicMap, priceMap);
   const baseOwnerCut = codecToNumber(globalOwnerCut) / 65535;
 
-  const current_lock_cost = rawLockCost ? Number(rawLockCost.toString()) / 1e9 : 0;
+  const current_lock_cost = rawLockCost ? codecToNumber(rawLockCost) / RAO_PER_TAO : 0;
 
   const liquidationSubnetsRaw: LiquidationSubnetRaw[] = [];
 
@@ -199,7 +199,9 @@ export async function queryBlockEmissionSnapshot(
       moving_price: fixed32ToNumber(dynamicInfo?.movingPrice),
       registration_allowed: codecToBoolean(registrationAllowedValues[index], true),
       subnetwork_n: codecToNumber(subnetworkNValues[index]),
-      max_allowed_uids: codecToNumber(maxAllowedUidsValues[index])
+      max_allowed_uids: codecToNumber(maxAllowedUidsValues[index]),
+      subnet_name,
+      owner_cut
     };
   });
 
