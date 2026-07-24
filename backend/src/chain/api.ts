@@ -3,51 +3,40 @@ import { getSetting } from '../services/settingsService.js';
 import { logger } from '../services/logService.js';
 import { parseRpcEndpoints } from '../utils/rpcEndpoints.js';
 
+const matchAnyVersion = (methods: Record<string, any>) =>
+  Array.from({ length: 1000 }, (_, i) => ({ methods, version: i + 1 }));
+
 const customRuntimeApis = {
-  SubnetInfoRuntimeApi: [
-    {
-      methods: {
-        get_all_dynamic_info: {
-          description: 'Get all dynamic info',
-          params: [],
-          type: 'Vec<Option<DynamicInfo>>'
-        },
-        get_dynamic_info: {
-          description: 'Get dynamic info for a subnet',
-          params: [
-            { name: 'netuid', type: 'u16' }
-          ],
-          type: 'Option<DynamicInfo>'
-        }
-      },
-      version: 1
+  SubnetInfoRuntimeApi: matchAnyVersion({
+    get_all_dynamic_info: {
+      description: 'Get all dynamic info',
+      params: [],
+      type: 'Vec<Option<DynamicInfo>>'
+    },
+    get_dynamic_info: {
+      description: 'Get dynamic info for a subnet',
+      params: [
+        { name: 'netuid', type: 'u16' }
+      ],
+      type: 'Option<DynamicInfo>'
     }
-  ],
-  SwapRuntimeApi: [
-    {
-      methods: {
-        current_alpha_price_all: {
-          description: 'Get all alpha prices',
-          params: [],
-          type: 'Vec<SubnetPrice>'
-        }
-      },
-      version: 1
+  }),
+  SwapRuntimeApi: matchAnyVersion({
+    current_alpha_price_all: {
+      description: 'Get all alpha prices',
+      params: [],
+      type: 'Vec<SubnetPrice>'
     }
-  ],
-  SubnetRegistrationRuntimeApi: [
-    {
-      methods: {
-        get_network_registration_cost: {
-          description: 'Get network registration cost',
-          params: [],
-          type: 'u64'
-        }
-      },
-      version: 1
+  }),
+  SubnetRegistrationRuntimeApi: matchAnyVersion({
+    get_network_registration_cost: {
+      description: 'Get network registration cost',
+      params: [],
+      type: 'u64'
     }
-  ]
+  })
 };
+
 
 let apiPromise: ApiPromise | null = null;
 let currentProvider: WsProvider | null = null;
