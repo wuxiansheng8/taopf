@@ -148,10 +148,11 @@ export default function StakeFlowPanel() {
       </div>
 
       <section className="glass-card flex min-h-0 flex-grow flex-col overflow-hidden rounded-lg p-4">
-        <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-gray-300">
+        <div className="mb-4 flex flex-shrink-0 flex-wrap items-center justify-start gap-4">
+          <h3 className="text-sm font-semibold text-gray-300 whitespace-nowrap">
             子网周期明细 ({visibleSubnets.length} 个子网)
           </h3>
+
           <label className="relative w-full sm:w-60">
             <Search className="absolute left-3 top-2 text-gray-500" size={14} />
             <input
