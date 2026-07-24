@@ -7,6 +7,7 @@ export interface MinerCompetitionChainState {
   uid_immunity_period: number;
   active_uids: number;
   rewarded_uids: number;
+  validator_uids: number;
   top10_incentive_share: number;
 }
 
@@ -26,10 +27,11 @@ export async function queryMinerCompetitionState(
     ...netuids.map(netuid => [apiAt.query.subtensorModule.immunityPeriod, netuid]),
     ...netuids.map(netuid => [apiAt.query.subtensorModule.active, netuid]),
     // NetUidStorageIndex is equal to netuid for the primary mechanism.
-    ...netuids.map(netuid => [apiAt.query.subtensorModule.incentive, netuid])
+    ...netuids.map(netuid => [apiAt.query.subtensorModule.incentive, netuid]),
+    ...netuids.map(netuid => [apiAt.query.subtensorModule.validatorPermit, netuid])
   ];
   const values = await apiAt.queryMulti(calls) as any[];
-  const expected = netuids.length * 4;
+  const expected = netuids.length * 5;
   if (values.length !== expected) {
     throw new Error(`矿工竞争查询返回数量异常: ${values.length}/${expected}`);
   }
@@ -39,10 +41,12 @@ export async function queryMinerCompetitionState(
   const immunityPeriods = values.slice(offset, offset += netuids.length);
   const activeVectors = values.slice(offset, offset += netuids.length);
   const incentiveVectors = values.slice(offset, offset += netuids.length);
+  const validatorPermitVectors = values.slice(offset, offset += netuids.length);
 
   return netuids.map((netuid, index) => {
     const active = codecArray(activeVectors[index]);
     const incentives = codecArray(incentiveVectors[index]).map(Number);
+    const validatorPermits = codecArray(validatorPermitVectors[index]);
     const incentiveTotal = incentives.reduce((sum, value) => sum + value, 0);
     const top10Total = [...incentives]
       .sort((left, right) => right - left)
@@ -55,6 +59,7 @@ export async function queryMinerCompetitionState(
       uid_immunity_period: codecToNumber(immunityPeriods[index]),
       active_uids: active.filter(Boolean).length,
       rewarded_uids: incentives.filter(value => value > 0).length,
+      validator_uids: validatorPermits.filter(Boolean).length,
       top10_incentive_share: incentiveTotal > 0 ? (top10Total / incentiveTotal) * 100 : 0
     };
   });

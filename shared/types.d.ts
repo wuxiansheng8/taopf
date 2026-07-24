@@ -87,6 +87,7 @@ export interface MinerCompetitionSubnet {
   max_allowed_uids: number;
   active_uids: number;
   rewarded_uids: number;
+  validator_uids: number;
   miner_emission_pool_tao_24h: number;
   daily_tao_per_uid: number;
   top10_incentive_share: number;

@@ -188,7 +188,7 @@ export default function MinerCompetitionPanel() {
       )}
 
       <section className="glass-card min-h-0 flex-grow overflow-auto rounded-lg">
-        <table className="w-full min-w-[1640px] table-fixed border-collapse text-xs">
+        <table className="w-full min-w-[1720px] table-fixed border-collapse text-xs">
           <colgroup>
             <col className="w-[150px]" />
             <col className="w-[80px]" />
@@ -198,6 +198,7 @@ export default function MinerCompetitionPanel() {
             <col className="w-[90px]" />
             <col className="w-[75px]" />
             <col className="w-[75px]" />
+            <col className="w-[80px]" />
             <col className="w-[125px]" />
             <col className="w-[110px]" />
             <col className="w-[100px]" />
@@ -217,6 +218,7 @@ export default function MinerCompetitionPanel() {
               <SortableHeader label="UID占用" field="subnetwork_n" onSort={changeSort} icon={sortIcon('subnetwork_n')} />
               <SortableHeader label="活跃UID" field="active_uids" onSort={changeSort} icon={sortIcon('active_uids')} />
               <SortableHeader label="奖励UID" field="rewarded_uids" onSort={changeSort} icon={sortIcon('rewarded_uids')} />
+              <SortableHeader label="验证者UID" field="validator_uids" onSort={changeSort} icon={sortIcon('validator_uids')} />
               <SortableHeader label="矿工排放池(日估算)" field="miner_emission_pool_tao_24h" onSort={changeSort} icon={sortIcon('miner_emission_pool_tao_24h')} />
               <SortableHeader label="单UID日均" field="daily_tao_per_uid" onSort={changeSort} icon={sortIcon('daily_tao_per_uid')} />
               <SortableHeader label="前10矿工占比" field="top10_incentive_share" onSort={changeSort} icon={sortIcon('top10_incentive_share')} />
@@ -254,6 +256,7 @@ export default function MinerCompetitionPanel() {
                 <NumberCell value={`${subnet.subnetwork_n} / ${subnet.max_allowed_uids}`} />
                 <NumberCell value={String(subnet.active_uids)} color="text-emerald-400" />
                 <NumberCell value={String(subnet.rewarded_uids)} color="text-blue-400" />
+                <NumberCell value={String(subnet.validator_uids)} />
                 <NumberCell value={`${formatNumber(subnet.miner_emission_pool_tao_24h, 4)} TAO`} />
                 <NumberCell value={`${formatNumber(subnet.daily_tao_per_uid, 4)} TAO`} color="text-cyan-300" />
                 <NumberCell value={`${formatNumber(subnet.top10_incentive_share, 1)}%`} />

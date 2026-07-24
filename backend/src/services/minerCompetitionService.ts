@@ -203,6 +203,7 @@ export async function getMinerCompetitionData(): Promise<MinerCompetitionSnapsho
       max_allowed_uids: subnet.max_allowed_uids,
       active_uids: chainState.active_uids,
       rewarded_uids: chainState.rewarded_uids,
+      validator_uids: chainState.validator_uids,
       miner_emission_pool_tao_24h: minerPoolTao24h,
       daily_tao_per_uid: dailyTaoPerUid,
       top10_incentive_share: chainState.top10_incentive_share,
