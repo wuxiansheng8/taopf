@@ -48,9 +48,6 @@ export async function startChainListener(): Promise<void> {
               parseBlockEvents(events as any, blockNumber, beijingTime);
               const stakeEvents = parseStakeFlowEvents(events as any, blockNumber);
 
-              // Wait for the previous miner task before starting another SQLite transaction.
-              await minerProcessingQueue;
-
               await recordStakeFlowBlock(stakeEvents, blockTimestampMs);
 
               // Calculate Liquidation snapshot

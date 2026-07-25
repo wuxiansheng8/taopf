@@ -1,4 +1,3 @@
-import { getDb } from '../db/connection.js';
 import {
   MinerCompetitionSnapshot,
   MinerCompetitionSubnet,
@@ -7,10 +6,10 @@ import {
 import { ParsedMinerRegEvent } from '../chain/minerEventParser.js';
 import { MinerCompetitionChainState } from '../chain/minerCompetitionReader.js';
 import { formatBeijingTime } from './logService.js';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HALF_DAY_MS = 12 * 60 * 60 * 1000;
-const EXPECTED_BLOCKS_PER_DAY = 7200;
+import {
+  EXPECTED_BLOCKS_PER_DAY,
+  minerCompetitionHistory
+} from './minerCompetitionHistory.js';
 
 interface ClassifiedMinerRegEvent extends ParsedMinerRegEvent {
   isReplacement: boolean | null;
@@ -26,7 +25,6 @@ interface RecordMinerCompetitionBlockInput {
 }
 
 let latestBlockNumber = 0;
-let latestBlockTimestampMs = 0;
 let latestBeijingTime = '';
 let currentChainState = new Map<number, MinerCompetitionChainState>();
 let currentSubnets = new Map<number, SubnetBlockData>();
@@ -69,49 +67,18 @@ export function classifyMinerRegistrationEvents(
 export async function recordMinerCompetitionBlock(
   input: RecordMinerCompetitionBlockInput
 ): Promise<void> {
-  const db = await getDb();
   const classifiedEvents = classifyMinerRegistrationEvents(input.events, input.previousSubnetworkN);
-  const cutoff24h = input.blockTimestampMs - DAY_MS;
-
-  await db.exec('BEGIN TRANSACTION');
-  try {
-    for (const event of classifiedEvents) {
-      await db.run(
-        `INSERT OR IGNORE INTO miner_registration_events
-         (block_number, event_index, netuid, uid, is_replacement, timestamp_ms)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          event.blockNumber,
-          event.eventIndex,
-          event.netuid,
-          event.uid,
-          event.isReplacement === null ? null : event.isReplacement ? 1 : 0,
-          input.blockTimestampMs
-        ]
-      );
-    }
-
-    for (const subnet of input.subnets) {
-      await db.run(
-        `INSERT OR REPLACE INTO miner_emission_snapshots
-         (block_number, netuid, miner_pool_tao_per_block, timestamp_ms)
-         VALUES (?, ?, ?, ?)`,
-        [input.blockNumber, subnet.netuid, calculateMinerPoolTaoPerBlock(subnet), input.blockTimestampMs]
-      );
-    }
-
-    if (input.blockNumber % EXPECTED_BLOCKS_PER_DAY === 0) {
-      await db.run('DELETE FROM miner_registration_events WHERE timestamp_ms < ?', [cutoff24h]);
-      await db.run('DELETE FROM miner_emission_snapshots WHERE timestamp_ms < ?', [cutoff24h]);
-    }
-    await db.exec('COMMIT');
-  } catch (error) {
-    await db.exec('ROLLBACK');
-    throw error;
-  }
+  const minerPools = new Map(
+    input.subnets.map(subnet => [subnet.netuid, calculateMinerPoolTaoPerBlock(subnet)])
+  );
+  minerCompetitionHistory.recordBlock(
+    input.blockNumber,
+    input.blockTimestampMs,
+    minerPools,
+    classifiedEvents
+  );
 
   latestBlockNumber = input.blockNumber;
-  latestBlockTimestampMs = input.blockTimestampMs;
   latestBeijingTime = formatBeijingTime(new Date(input.blockTimestampMs));
   currentChainState = new Map(input.chainState.map(state => [state.netuid, state]));
   currentSubnets = new Map(input.subnets.map(subnet => [subnet.netuid, subnet]));
@@ -120,69 +87,30 @@ export async function recordMinerCompetitionBlock(
 export async function getMinerCompetitionData(): Promise<MinerCompetitionSnapshot | null> {
   if (latestBlockNumber === 0 || currentChainState.size === 0) return null;
 
-  const db = await getDb();
-  const cutoff24h = latestBlockTimestampMs - DAY_MS;
-  const cutoff12h = latestBlockTimestampMs - HALF_DAY_MS;
-
-  const coverageRow = await db.get<{ observed_blocks: number }>(
-    `SELECT COUNT(DISTINCT block_number) AS observed_blocks
-     FROM miner_emission_snapshots WHERE timestamp_ms >= ?`,
-    [cutoff24h]
-  );
-  const observedBlocks = coverageRow?.observed_blocks || 0;
-  const historyCoverageRatio = Math.min(1, observedBlocks / EXPECTED_BLOCKS_PER_DAY);
-
-  const eventRows = await db.all<{
-    netuid: number;
-    reg_count: number;
-    replace_count: number;
-    unknown_count: number;
-  }[]>(
-    `SELECT netuid,
-       COUNT(*) AS reg_count,
-       SUM(CASE WHEN is_replacement = 1 THEN 1 ELSE 0 END) AS replace_count,
-       SUM(CASE WHEN is_replacement IS NULL THEN 1 ELSE 0 END) AS unknown_count
-     FROM miner_registration_events WHERE timestamp_ms >= ? GROUP BY netuid`,
-    [cutoff24h]
-  );
-  const eventMap = new Map(eventRows.map(row => [row.netuid, row]));
-
-  const trendRows = await db.all<{
-    netuid: number;
-    recent_avg: number | null;
-    previous_avg: number | null;
-  }[]>(
-    `SELECT netuid,
-       AVG(CASE WHEN timestamp_ms >= ? THEN miner_pool_tao_per_block END) AS recent_avg,
-       AVG(CASE WHEN timestamp_ms < ? THEN miner_pool_tao_per_block END) AS previous_avg
-     FROM miner_emission_snapshots WHERE timestamp_ms >= ? GROUP BY netuid`,
-    [cutoff12h, cutoff12h, cutoff24h]
-  );
-  const trendMap = new Map(trendRows.map(row => [row.netuid, row]));
+  const history = minerCompetitionHistory.getSnapshot();
 
   const subnets: MinerCompetitionSubnet[] = [];
   for (const [netuid, subnet] of currentSubnets) {
     const chainState = currentChainState.get(netuid);
     if (!chainState) continue;
 
-    const eventData = eventMap.get(netuid);
-    const trendData = trendMap.get(netuid);
+    const historyData = history.subnets.get(netuid);
     const minerPoolTao24h = calculateMinerPoolTaoPerBlock(subnet) * EXPECTED_BLOCKS_PER_DAY;
     const dailyTaoPerUid = subnet.subnetwork_n > 0
       ? minerPoolTao24h / subnet.subnetwork_n
       : 0;
-    const replaceCount = (eventData?.unknown_count || 0) > 0
+    const replaceCount = (historyData?.unknownReplacementCount || 0) > 0
       ? null
-      : eventData?.replace_count || 0;
+      : historyData?.replacementCount || 0;
     const turnoverRate = replaceCount !== null && subnet.max_allowed_uids > 0
       ? (replaceCount / subnet.max_allowed_uids) * 100
       : null;
 
-    const recentAverage = trendData?.recent_avg;
-    const previousAverage = trendData?.previous_avg;
+    const recentAverage = historyData?.recentEmissionAverage;
+    const previousAverage = historyData?.previousEmissionAverage;
     let emissionTrendPercent: number | null = null;
     if (
-      historyCoverageRatio >= 0.95
+      history.coverageRatio >= 0.95
       && recentAverage !== null
       && recentAverage !== undefined
       && previousAverage !== null
@@ -207,7 +135,7 @@ export async function getMinerCompetitionData(): Promise<MinerCompetitionSnapsho
       miner_emission_pool_tao_24h: minerPoolTao24h,
       daily_tao_per_uid: dailyTaoPerUid,
       top10_incentive_share: chainState.top10_incentive_share,
-      reg_count_24h: eventData?.reg_count || 0,
+      reg_count_24h: historyData?.registrationCount || 0,
       replace_count_24h: replaceCount,
       turnover_rate_24h: turnoverRate,
       emission_trend_percent: emissionTrendPercent,
@@ -220,8 +148,8 @@ export async function getMinerCompetitionData(): Promise<MinerCompetitionSnapsho
   return {
     block_number: latestBlockNumber,
     beijing_time: latestBeijingTime,
-    observed_blocks_24h: observedBlocks,
-    history_coverage_ratio: historyCoverageRatio,
+    observed_blocks_24h: history.observedBlocks,
+    history_coverage_ratio: history.coverageRatio,
     subnets
   };
 }
