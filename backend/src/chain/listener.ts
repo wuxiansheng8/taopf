@@ -11,7 +11,41 @@ import { queryMinerCompetitionState } from './minerCompetitionReader.js';
 import { recordMinerCompetitionBlock } from '../services/minerCompetitionService.js';
 import { LiquidationSubnet, LiquidationSnapshot } from '../../../shared/types.js';
 
+const UNKNOWN_BLOCK_RETRY_DELAYS_MS = [300, 700, 1500] as const;
+
 let isListening = false;
+
+function isUnknownBlockError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('UnknownBlock')
+    || message.includes('Header was not found')
+    || message.includes('Expect block number from id');
+}
+
+async function readBlockSnapshotWithRetry(
+  api: Awaited<ReturnType<typeof getApi>>,
+  blockHash: string,
+  blockNumber: number
+) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const apiAt = await api.at(blockHash);
+      const [rawTimestamp, snapshot] = await Promise.all([
+        apiAt.query.timestamp.now(),
+        queryBlockEmissionSnapshot(apiAt)
+      ]);
+      return { apiAt, rawTimestamp, snapshot };
+    } catch (error) {
+      const delayMs = UNKNOWN_BLOCK_RETRY_DELAYS_MS[attempt];
+      if (!isUnknownBlockError(error) || delayMs === undefined) {
+        throw error;
+      }
+
+      logger.warn(`区块 #${blockNumber} 暂时不可读取，${delayMs}ms 后重试 (${attempt + 1}/${UNKNOWN_BLOCK_RETRY_DELAYS_MS.length})`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
 
 export async function startChainListener(): Promise<void> {
   if (isListening) return;
@@ -36,11 +70,11 @@ export async function startChainListener(): Promise<void> {
           // Append block processing to the serial Promise chain queue
           processingQueue = processingQueue.then(async () => {
             try {
-              const apiAt = await api.at(blockHash);
-              const [rawTimestamp, snapshot] = await Promise.all([
-                apiAt.query.timestamp.now(),
-                queryBlockEmissionSnapshot(apiAt)
-              ]);
+              const { apiAt, rawTimestamp, snapshot } = await readBlockSnapshotWithRetry(
+                api,
+                blockHash,
+                blockNumber
+              );
               const blockTimestampMs = Number(rawTimestamp.toString());
               const { events, subnetsData, rawLiquidation } = snapshot;
               const previousEmissions = getCurrentBlockEmissions();
