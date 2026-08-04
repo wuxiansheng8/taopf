@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS stake_events_log (
     PRIMARY KEY (block_number, event_index)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS root_basket_claim_sells (
+    block_number INTEGER NOT NULL,
+    netuid INTEGER NOT NULL,
+    sold_tao REAL NOT NULL CHECK (sold_tao > 0),
+    sampled_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (block_number, netuid)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_root_basket_claim_sells_time
+ON root_basket_claim_sells(sampled_at_ms);
+
 -- 5. 已监听周期表，用于区分零交易和停机
 CREATE TABLE IF NOT EXISTS stake_flow_periods (
     date_key TEXT PRIMARY KEY

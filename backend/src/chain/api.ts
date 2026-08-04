@@ -3,6 +3,11 @@ import { getSetting } from '../services/settingsService.js';
 import { logger } from '../services/logService.js';
 import { parseRpcEndpoints } from '../utils/rpcEndpoints.js';
 
+export interface RuntimeUpgrade {
+  previousVersion: number;
+  nextVersion: number;
+}
+
 let apiPromise: ApiPromise | null = null;
 let currentProvider: WsProvider | null = null;
 
@@ -53,6 +58,29 @@ export async function getApi(): Promise<ApiPromise> {
   return apiPromise;
 }
 
+export async function subscribeRuntimeUpgrade(
+  api: ApiPromise,
+  onUpgrade: (upgrade: RuntimeUpgrade) => void
+): Promise<() => void> {
+  const previousVersion = api.runtimeVersion.specVersion.toNumber();
+  let active = true;
+
+  const unsubscribe = await api.rpc.state.subscribeRuntimeVersion((runtimeVersion) => {
+    if (!active) return;
+
+    const nextVersion = runtimeVersion.specVersion.toNumber();
+    if (nextVersion === previousVersion) return;
+
+    active = false;
+    onUpgrade({ previousVersion, nextVersion });
+  });
+
+  return () => {
+    active = false;
+    unsubscribe();
+  };
+}
+
 export async function testRpc(endpoint: string): Promise<{ success: boolean; latency: string; version: number; error?: string }> {
   const t0 = Date.now();
   let provider: WsProvider | null = null;
@@ -82,7 +110,7 @@ export async function testRpc(endpoint: string): Promise<{ success: boolean; lat
 export async function disconnectApi(): Promise<void> {
   if (apiPromise) {
     try {
-      logger.info('主动断开当前的 Subtensor RPC 客户端连接以应用新配置...');
+      logger.info('正在关闭当前 Subtensor RPC 连接...');
       await apiPromise.disconnect();
     } catch (e) {}
     apiPromise = null;

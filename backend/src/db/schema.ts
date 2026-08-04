@@ -66,4 +66,28 @@ CREATE TABLE IF NOT EXISTS daily_stake_summary (
     PRIMARY KEY (date_key, netuid)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS root_basket_snapshots (
+    sampled_at_ms INTEGER NOT NULL,
+    block_number INTEGER NOT NULL,
+    netuid INTEGER NOT NULL,
+    basket_alpha REAL NOT NULL,
+    alpha_price REAL NOT NULL,
+    estimated_income_24h_tao REAL,
+    PRIMARY KEY (sampled_at_ms, netuid)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_root_basket_snapshots_time
+ON root_basket_snapshots(sampled_at_ms);
+
+CREATE TABLE IF NOT EXISTS root_basket_claim_sells (
+    block_number INTEGER NOT NULL,
+    netuid INTEGER NOT NULL,
+    sold_tao REAL NOT NULL CHECK (sold_tao > 0),
+    sampled_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (block_number, netuid)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_root_basket_claim_sells_time
+ON root_basket_claim_sells(sampled_at_ms);
+
 `;

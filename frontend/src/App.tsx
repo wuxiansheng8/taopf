@@ -7,13 +7,14 @@ import SettingsPanel from './components/SettingsPanel.tsx';
 import LiquidationPanel from './components/LiquidationPanel.tsx';
 import StakeFlowPanel from './components/StakeFlowPanel.tsx';
 import MinerCompetitionPanel from './components/MinerCompetitionPanel.tsx';
+import RootBasketFlowPanel from './components/RootBasketFlowPanel.tsx';
 import client from './api/client.ts';
 import { SubnetBlockData, LiquidationSnapshot } from '../../shared/types.ts';
-import { Activity, ArrowLeftRight, Terminal, Settings, Lock, TrendingDown, Pickaxe } from 'lucide-react';
+import { Activity, ArrowLeftRight, Terminal, Settings, Lock, TrendingDown, Pickaxe, BarChart3 } from 'lucide-react';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('taopf_token'));
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'liquidation' | 'stake-flow' | 'miner-competition' | 'logs' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'liquidation' | 'stake-flow' | 'miner-competition' | 'root-basket' | 'logs' | 'settings'>('dashboard');
 
   const [dataMode, setDataMode] = useState<'current' | '24h'>('current');
   const [searchQuery, setSearchQuery] = useState('');
@@ -200,6 +201,18 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setActiveTab('root-basket')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
+              activeTab === 'root-basket'
+                ? 'bg-blue-500/10 text-white border-l-2 border-accentBlue'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <BarChart3 size={16} />
+            <span>Root 篮子资金流</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('logs')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-150 ${
               activeTab === 'logs'
@@ -303,6 +316,8 @@ export default function App() {
           {activeTab === 'stake-flow' && <StakeFlowPanel />}
 
           {activeTab === 'miner-competition' && <MinerCompetitionPanel />}
+
+          {activeTab === 'root-basket' && <RootBasketFlowPanel />}
 
           {activeTab === 'logs' && <LogsPanel realtimeLogs={realtimeLogs} />}
 

@@ -18,6 +18,8 @@ import { settingsRoutes } from './routes/settings.js';
 import { logsRoutes } from './routes/logs.js';
 import { stakeFlowRoutes } from './routes/stakeFlow.js';
 import minerCompetitionRoutes from './routes/minerCompetition.js';
+import rootBasketRoutes from './routes/rootBasket.js';
+import { initRootBasketService } from './services/rootBasketService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +39,7 @@ await fastify.register(settingsRoutes);
 await fastify.register(logsRoutes);
 await fastify.register(stakeFlowRoutes);
 await fastify.register(minerCompetitionRoutes);
+await fastify.register(rootBasketRoutes);
 
 // Serve frontend build files
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
@@ -61,6 +64,7 @@ const start = async () => {
     
     // 3. Populate memory emissions cache
     await initEmissionsCache();
+    await initRootBasketService();
 
     // 3.5 Register optional burn-rate monitoring
     initBurnRateMonitor();

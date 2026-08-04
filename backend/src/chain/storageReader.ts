@@ -1,6 +1,7 @@
 import { ApiDecoration } from '@polkadot/api/types';
 import { SubnetBlockData } from '../../../shared/types.js';
 import { codecToBoolean, codecToNumber, fixed32ToNumber, RAO_PER_TAO } from './chainValueParser.js';
+import { readOptionalRuntimeData, resolveAlphaPrices } from './optionalRuntimeReader.js';
 import { readSubnetStorageSnapshot } from './subnetStorageReader.js';
 
 export interface LiquidationSubnetRaw {
@@ -23,28 +24,25 @@ export async function queryBlockEmissionSnapshot(
     liquidationSubnetsRaw: LiquidationSubnetRaw[];
   }
 }> {
-  const [snapshot, events, rawLockCost, alphaPrices] = await Promise.all([
+  const [snapshot, events, optionalRuntime] = await Promise.all([
     readSubnetStorageSnapshot(apiAt),
     apiAt.query.system.events() as unknown as Promise<any[]>,
-    readCurrentLockCost(apiAt),
-    readAlphaPrices(apiAt)
+    readOptionalRuntimeData(apiAt)
   ]);
   const { subnets, globalOwnerCut, networkImmunityPeriod, subnetLimit } = snapshot;
   if (subnets.length === 0) {
     throw new Error('未返回任何非 Root 子网');
   }
+  const alphaPrices = resolveAlphaPrices(subnets, optionalRuntime.alphaPrices);
   const baseOwnerCut = codecToNumber(globalOwnerCut) / 65535;
-  const current_lock_cost = codecToNumber(rawLockCost) / RAO_PER_TAO;
+  const current_lock_cost = optionalRuntime.registrationCostTao;
 
   const liquidationSubnetsRaw: LiquidationSubnetRaw[] = [];
 
   const subnetsData = subnets.map((subnet): SubnetBlockData => {
     const enabled = codecToBoolean(subnet.emissionEnabled, true);
     const alpha_out = codecToNumber(subnet.alphaOutEmission) / RAO_PER_TAO;
-    const alpha_price = alphaPrices.get(subnet.netuid);
-    if (alpha_price === undefined) {
-      throw new Error(`Alpha 价格缺少子网: ${subnet.netuid}`);
-    }
+    const alpha_price = alphaPrices.get(subnet.netuid) ?? 0;
     const root_prop = fixed32ToNumber(subnet.rootProp);
     const owner_cut = codecToBoolean(subnet.ownerCutEnabled, true) ? baseOwnerCut : 0;
     const neuron_alpha = alpha_out * (1 - owner_cut) * (1 - root_prop * 0.5);
@@ -94,27 +92,4 @@ export async function queryBlockEmissionSnapshot(
       liquidationSubnetsRaw
     }
   };
-}
-
-async function readCurrentLockCost(apiAt: ApiDecoration<'promise'>): Promise<unknown> {
-  const runtimeApi = (apiAt.call as any).subnetRegistrationRuntimeApi;
-  if (typeof runtimeApi?.getNetworkRegistrationCost !== 'function') {
-    throw new Error('Subnet Registration Runtime API getNetworkRegistrationCost 不可用');
-  }
-
-  return runtimeApi.getNetworkRegistrationCost();
-}
-
-async function readAlphaPrices(apiAt: ApiDecoration<'promise'>): Promise<Map<number, number>> {
-  const runtimeApi = (apiAt.call as any).swapRuntimeApi;
-  if (typeof runtimeApi?.currentAlphaPriceAll !== 'function') {
-    throw new Error('Swap Runtime API currentAlphaPriceAll 不可用');
-  }
-
-  const rawPrices = await runtimeApi.currentAlphaPriceAll();
-  const prices = rawPrices.toJSON() as Array<{ netuid: number; price: unknown }> | null;
-  return new Map((prices ?? []).map((item) => [
-    Number(item.netuid),
-    codecToNumber(item.price) / RAO_PER_TAO
-  ]));
 }

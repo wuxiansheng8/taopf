@@ -105,3 +105,50 @@ export interface MinerCompetitionSnapshot {
   history_coverage_ratio: number;
   subnets: MinerCompetitionSubnet[];
 }
+
+export interface RootBasketSubnetRow {
+  netuid: number;
+  subnet_name: string;
+  pointing_validator_count: number;
+  top_validator_count: number;
+  weighted_target_share: number;
+  basket_alpha: number;
+  holding_change_1h_alpha: number | null;
+  holding_change_24h_alpha: number | null;
+  estimated_buy_24h_tao: number | null;
+  estimated_buy_pool_share: number | null;
+  estimated_net_pressure_24h_tao: number | null;
+  alpha_price_change_1h: number | null;
+  alpha_price_change_24h: number | null;
+}
+
+export interface RootBasketValidatorDetail {
+  hotkey: string;
+  validator_name: string;
+  root_stake_share: number;
+  subnet_weight: number;
+  global_weight: number;
+  last_weight_change_time: string | null;
+}
+
+export interface RootBasketOverview {
+  block_number: number;
+  beijing_time: string;
+  summary: {
+    claim_threshold_tao: number;
+    root_weight_setting_enabled: boolean;
+    root_validator_count: number;
+    basket_validator_count: number;
+    custom_weight_validator_count: number;
+    top10_root_stake_share: number;
+    top10_custom_weight_count: number;
+    concentrated_subnets: Array<{ netuid: number; subnet_name: string; weighted_target_share: number }>;
+  };
+  subnets: RootBasketSubnetRow[];
+}
+
+export interface RootBasketSubnetDetail {
+  netuid: number;
+  subnet_name: string;
+  validators: RootBasketValidatorDetail[];
+}

@@ -1,4 +1,4 @@
-import { getApi } from './api.js';
+import { disconnectApi, getApi, RuntimeUpgrade, subscribeRuntimeUpgrade } from './api.js';
 import { queryBlockEmissionSnapshot } from './storageReader.js';
 import { parseBlockEvents } from './eventParser.js';
 import { parseStakeFlowEvents } from './stakeFlowEventParser.js';
@@ -9,6 +9,8 @@ import { recordStakeFlowBlock } from '../services/stakeFlowService.js';
 import { parseMinerRegEvents } from './minerEventParser.js';
 import { queryMinerCompetitionState } from './minerCompetitionReader.js';
 import { recordMinerCompetitionBlock } from '../services/minerCompetitionService.js';
+import { logRootBasketError, recordRootBasketBlock } from '../services/rootBasketService.js';
+import { calculateRootIncomeTao } from '../services/rootBasketCalculator.js';
 import { LiquidationSubnet, LiquidationSnapshot } from '../../../shared/types.js';
 
 const UNKNOWN_BLOCK_RETRY_DELAYS_MS = [300, 700, 1500] as const;
@@ -60,6 +62,27 @@ export async function startChainListener(): Promise<void> {
         let blockLatencies: number[] = [];
         let processingQueue = Promise.resolve();
         let minerProcessingQueue = Promise.resolve();
+        let rootBasketProcessingQueue = Promise.resolve();
+
+        type SessionEnd =
+          | { type: 'runtime'; upgrade: RuntimeUpgrade }
+          | { type: 'disconnect' };
+        let endSession!: (reason: SessionEnd) => void;
+        let sessionEnded = false;
+        const sessionEnd = new Promise<SessionEnd>((resolve) => {
+          endSession = (reason) => {
+            if (sessionEnded) return;
+            sessionEnded = true;
+            resolve(reason);
+          };
+        });
+
+        const stopRuntimeWatch = await subscribeRuntimeUpgrade(
+          api,
+          (upgrade) => endSession({ type: 'runtime', upgrade })
+        );
+        const onDisconnected = () => endSession({ type: 'disconnect' });
+        api.once('disconnected', onDisconnected);
 
         // Subscribe to block heads
         const unsubscribe = await api.rpc.chain.subscribeNewHeads((header) => {
@@ -164,6 +187,26 @@ export async function startChainListener(): Promise<void> {
                 });
               }
 
+              rootBasketProcessingQueue = rootBasketProcessingQueue.then(async () => {
+                await recordRootBasketBlock(
+                  apiAt,
+                  blockNumber,
+                  blockTimestampMs,
+                  subnetsData.map((subnet) => ({
+                    netuid: subnet.netuid,
+                    subnet_name: subnet.subnet_name,
+                    subnet_tao: subnet.subnet_tao,
+                    alpha_price: subnet.alpha_price,
+                    root_income_tao: calculateRootIncomeTao(
+                      subnet.alpha_out,
+                      subnet.owner_cut || 0,
+                      subnet.root_prop,
+                      subnet.alpha_price
+                    )
+                  }))
+                );
+              }).catch(logRootBasketError);
+
               blockLatencies.push(Date.now() - t0);
               if (blockLatencies.length >= 100) {
                 const sum = blockLatencies.reduce((a, b) => a + b, 0);
@@ -177,21 +220,30 @@ export async function startChainListener(): Promise<void> {
             }
           });
         });
-        
-        // Wait until API is disconnected
-        await new Promise((resolve) => {
-          const timer = setInterval(() => {
-            if (!api.isConnected) {
-              clearInterval(timer);
-              unsubscribe();
-              resolve(null);
-            }
-          }, 3000);
-        });
-        
-        logger.warn('链连接已断开，事件订阅已取消，准备尝试重连...');
+
+        const reason = await sessionEnd;
+        unsubscribe();
+        stopRuntimeWatch();
+        api.off('disconnected', onDisconnected);
+
+        await Promise.all([
+          processingQueue,
+          minerProcessingQueue,
+          rootBasketProcessingQueue
+        ]);
+
+        if (reason.type === 'runtime') {
+          logger.warn(
+            `检测到主网 Runtime 升级 ${reason.upgrade.previousVersion} → ${reason.upgrade.nextVersion}，正在重新加载链上接口...`
+          );
+        } else {
+          logger.warn('链连接已断开，准备重新连接...');
+        }
+
+        await disconnectApi();
       } catch (err: any) {
         logger.error(`监听线程出现故障: ${err.message || String(err)}. 5秒后尝试重连...`);
+        await disconnectApi();
         await new Promise(r => setTimeout(r, 5000));
       }
     }
