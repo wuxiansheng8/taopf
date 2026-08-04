@@ -24,6 +24,12 @@ function isUnknownBlockError(error: unknown): boolean {
     || message.includes('Expect block number from id');
 }
 
+export function isRuntimeMetadataError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('Runtime API')
+    && (message.includes('不可用') || message.toLowerCase().includes('unavailable'));
+}
+
 async function readBlockSnapshotWithRetry(
   api: Awaited<ReturnType<typeof getApi>>,
   blockHash: string,
@@ -66,6 +72,7 @@ export async function startChainListener(): Promise<void> {
 
         type SessionEnd =
           | { type: 'runtime'; upgrade: RuntimeUpgrade }
+          | { type: 'reload'; message: string }
           | { type: 'disconnect' };
         let endSession!: (reason: SessionEnd) => void;
         let sessionEnded = false;
@@ -216,6 +223,10 @@ export async function startChainListener(): Promise<void> {
                 blockLatencies = [];
               }
             } catch (err: any) {
+              if (isRuntimeMetadataError(err)) {
+                endSession({ type: 'reload', message: err.message || String(err) });
+                return;
+              }
               logger.error(`处理新块 #${blockNumber} 出错: ${err.message || String(err)}`);
             }
           });
@@ -236,6 +247,8 @@ export async function startChainListener(): Promise<void> {
           logger.warn(
             `检测到主网 Runtime 升级 ${reason.upgrade.previousVersion} → ${reason.upgrade.nextVersion}，正在重新加载链上接口...`
           );
+        } else if (reason.type === 'reload') {
+          logger.warn(`检测到链上接口缓存过期，正在重新加载: ${reason.message}`);
         } else {
           logger.warn('链连接已断开，准备重新连接...');
         }
