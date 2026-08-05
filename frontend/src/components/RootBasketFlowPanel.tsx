@@ -5,21 +5,21 @@ import { RootBasketOverview, RootBasketSubnetDetail, RootBasketSubnetRow } from 
 
 type SortField = keyof RootBasketSubnetRow;
 
-const COLUMNS: Array<{ field: SortField; label: string }> = [
-  { field: 'netuid', label: '子网' },
-  { field: 'pointing_validator_count', label: '验证者权重' },
-  { field: 'holder_count', label: '总持仓篮子' },
-  { field: 'weighted_target_share', label: '全网权重' },
-  { field: 'basket_value_tao', label: '篮子持仓(T)' },
-  { field: 'root_capital_share', label: '全网篮子占比' },
-  { field: 'pool_share', label: '占本子网TAO池' },
-  { field: 'holding_change_1h_alpha', label: '1H篮子Alpha变化' },
-  { field: 'holding_change_24h_alpha', label: '24H篮子Alpha变化' },
-  { field: 'estimated_buy_24h_tao', label: '预计24H买入' },
-  { field: 'estimated_buy_pool_share', label: '预计买入占池比' },
-  { field: 'estimated_net_pressure_24h_tao', label: '预计24H净压力' },
-  { field: 'alpha_price_change_1h', label: 'Alpha涨跌1H' },
-  { field: 'alpha_price_change_24h', label: 'Alpha涨跌24H' }
+const COLUMNS: Array<{ field: SortField; label: string; description: string }> = [
+  { field: 'netuid', label: '子网', description: '子网编号。鼠标停在SN编号上可查看完整子网名称。' },
+  { field: 'pointing_validator_count', label: '验证者权重', description: '有多少个 Root 验证者把权重指向这个子网。' },
+  { field: 'holder_count', label: '总持仓篮子', description: '全网有多少个 Basket 持有该子网 Alpha。' },
+  { field: 'weighted_target_share', label: '全网权重', description: '所有 Root 验证者合起来，计划把多少比例的收益分配到这个子网。' },
+  { field: 'basket_value_tao', label: '篮子总持仓(T)', description: '全部 Basket 持有的该子网 Alpha，按当前价格折算成的 TAO 价值。' },
+  { field: 'root_capital_share', label: '全网篮子占比', description: '该子网篮子持仓价值，占所有 Basket 持仓总价值的比例。' },
+  { field: 'pool_share', label: '占本子网TAO池', description: '该子网篮子持仓价值，占该子网 TAO 池的比例。' },
+  { field: 'holding_change_1h_alpha', label: '1H篮子Alpha变化', description: '当前篮子 Alpha 数量减去约1小时前的数量。正数表示净增加，负数表示净减少。' },
+  { field: 'holding_change_24h_alpha', label: '24H篮子Alpha变化', description: '当前篮子 Alpha 数量减去约24小时前的数量。正数表示净增加，负数表示净减少。' },
+  { field: 'estimated_buy_24h_tao', label: '预计24H买入', description: '按当前 Root 验证者权重估算，未来24小时预计买入该子网的 TAO 数量。' },
+  { field: 'estimated_buy_pool_share', label: '预计买入占池比', description: '预计24小时买入量，占该子网 TAO 池的比例。' },
+  { field: 'estimated_net_pressure_24h_tao', label: '预计24H净压力', description: '预计未来24小时，这个子网会有多少资金净买入或净卖出。' },
+  { field: 'alpha_price_change_1h', label: 'Alpha涨跌1H', description: '当前 Alpha 价格相比约1小时前的涨跌比例。' },
+  { field: 'alpha_price_change_24h', label: 'Alpha涨跌24H', description: '当前 Alpha 价格相比约24小时前的涨跌比例。' }
 ];
 
 function percent(value: number | null): string {
@@ -38,6 +38,15 @@ function directionColor(value: number | null): string {
 
 function tao(value: number): string {
   return `${value.toFixed(2)}T`;
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function sumDefined(values: Array<number | null>): number | null {
+  const defined = values.filter((value): value is number => value !== null);
+  return defined.length > 0 ? sum(defined) : null;
 }
 
 export default function RootBasketFlowPanel() {
@@ -100,6 +109,17 @@ export default function RootBasketFlowPanel() {
       return sortAscending ? comparison : -comparison;
     });
   }, [overview, sortAscending, sortField]);
+
+  const totals = useMemo(() => {
+    const subnets = overview?.subnets ?? [];
+    return {
+      weightedTargetShare: sum(subnets.map((subnet) => subnet.weighted_target_share)),
+      basketValueTao: sum(subnets.map((subnet) => subnet.basket_value_tao)),
+      rootCapitalShare: sum(subnets.map((subnet) => subnet.root_capital_share)),
+      estimatedBuyTao: sumDefined(subnets.map((subnet) => subnet.estimated_buy_24h_tao)),
+      estimatedNetPressureTao: sumDefined(subnets.map((subnet) => subnet.estimated_net_pressure_24h_tao))
+    };
+  }, [overview]);
 
   const changeSort = (field: SortField) => {
     if (field === sortField) {
@@ -169,12 +189,13 @@ export default function RootBasketFlowPanel() {
         <table className="min-w-[1320px] w-full text-xs">
           <thead className="sticky top-0 z-10 bg-[#0f141f] text-gray-400">
             <tr>
-              <th className="sticky left-0 z-30 w-14 border-b border-white/5 bg-[#0f141f] px-2 py-3 text-center font-semibold whitespace-nowrap">序号</th>
+              <th title="当前排序下的名次。" className="sticky left-0 z-30 w-14 border-b border-white/5 bg-[#0f141f] px-2 py-3 text-center font-semibold whitespace-nowrap">序号</th>
               {COLUMNS.map(column => (
                 <th key={column.field} className="border-b border-white/5 px-3 py-3 font-semibold whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => changeSort(column.field)}
+                    title={column.description}
                     className="mx-auto flex items-center gap-1 hover:text-white"
                   >
                     {column.label}
@@ -214,6 +235,25 @@ export default function RootBasketFlowPanel() {
               </Fragment>
             ))}
           </tbody>
+          <tfoot className="sticky bottom-0 z-20 border-t-2 border-white/10 bg-[#0f141f] text-gray-300 shadow-[0_-4px_12px_rgba(0,0,0,0.18)]">
+            <tr>
+              <td className="sticky left-0 z-30 w-14 bg-[#0f141f] px-2 py-3 text-center" />
+              <td className="px-3 py-3 text-center font-semibold text-white">合计</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className="px-3 py-3 text-center text-cyan-300">{percent(totals.weightedTargetShare)}</td>
+              <td className="px-3 py-3 text-center font-semibold text-white">{tao(totals.basketValueTao)}</td>
+              <td className="px-3 py-3 text-center text-cyan-300">{percent(totals.rootCapitalShare)}</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className="px-3 py-3 text-center text-amber-300">{totals.estimatedBuyTao === null ? '--' : tao(totals.estimatedBuyTao)}</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className={`px-3 py-3 text-center ${directionColor(totals.estimatedNetPressureTao)}`}>{totals.estimatedNetPressureTao === null ? '--' : `${signed(totals.estimatedNetPressureTao)}T`}</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+              <td className="px-3 py-3 text-center text-gray-500">--</td>
+            </tr>
+          </tfoot>
         </table>
       </section>
     </div>
