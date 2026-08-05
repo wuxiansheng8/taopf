@@ -88,7 +88,6 @@ export async function recordRootBasketBlock(
 ): Promise<void> {
   const snapshot = await readRootBasketSnapshot(apiAt, blockNumber, timestampMs, subnets);
   detectWeightChanges(snapshot);
-  const previous = latestSnapshot;
   const now = snapshot.timestamp_ms;
   const db = await getDb();
   for (const subnet of snapshot.subnets) {
@@ -128,7 +127,7 @@ export async function recordRootBasketBlock(
     items.push({ netuid: subnet.netuid, sampled_at_ms: now, block_number: blockNumber, basket_alpha: basketAlpha, alpha_price: subnet.alpha_price, estimated_income_24h_tao: income24h });
     history.set(subnet.netuid, items.slice(-17280));
   }
-  latestOverview = calculateOverview(snapshot, history, previous, getClaimSell24h(now));
+  latestOverview = calculateOverview(snapshot, history, getClaimSell24h(now));
   latestSnapshot = snapshot;
 }
 

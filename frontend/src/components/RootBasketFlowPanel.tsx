@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import client from '../api/client.ts';
 import { RootBasketOverview, RootBasketSubnetDetail, RootBasketSubnetRow } from '../../../shared/types.js';
@@ -7,17 +7,19 @@ type SortField = keyof RootBasketSubnetRow;
 
 const COLUMNS: Array<{ field: SortField; label: string }> = [
   { field: 'netuid', label: '子网' },
-  { field: 'pointing_validator_count', label: '指向验证者' },
-  { field: 'top_validator_count', label: '头部验证者' },
+  { field: 'pointing_validator_count', label: '验证者权重' },
+  { field: 'holder_count', label: '总持仓篮子' },
   { field: 'weighted_target_share', label: '全网权重' },
-  { field: 'basket_alpha', label: 'Basket持仓Alpha' },
-  { field: 'holding_change_1h_alpha', label: '1H持仓变化' },
-  { field: 'holding_change_24h_alpha', label: '24H持仓变化' },
+  { field: 'basket_value_tao', label: '篮子持仓(T)' },
+  { field: 'root_capital_share', label: '全网篮子占比' },
+  { field: 'pool_share', label: '占本子网TAO池' },
+  { field: 'holding_change_1h_alpha', label: '1H篮子Alpha变化' },
+  { field: 'holding_change_24h_alpha', label: '24H篮子Alpha变化' },
   { field: 'estimated_buy_24h_tao', label: '预计24H买入' },
-  { field: 'estimated_buy_pool_share', label: '预计买入/池子' },
+  { field: 'estimated_buy_pool_share', label: '预计买入占池比' },
   { field: 'estimated_net_pressure_24h_tao', label: '预计24H净压力' },
-  { field: 'alpha_price_change_1h', label: 'Alpha价格1H' },
-  { field: 'alpha_price_change_24h', label: 'Alpha价格24H' }
+  { field: 'alpha_price_change_1h', label: 'Alpha涨跌1H' },
+  { field: 'alpha_price_change_24h', label: 'Alpha涨跌24H' }
 ];
 
 function percent(value: number | null): string {
@@ -29,8 +31,13 @@ function signed(value: number | null, digits = 2): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 }
 
-function alpha(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+function directionColor(value: number | null): string {
+  if (value === null || value === 0) return 'text-gray-400';
+  return value > 0 ? 'text-emerald-400' : 'text-rose-400';
+}
+
+function tao(value: number): string {
+  return `${value.toFixed(2)}T`;
 }
 
 export default function RootBasketFlowPanel() {
@@ -128,9 +135,34 @@ export default function RootBasketFlowPanel() {
 
       <section className="grid flex-shrink-0 grid-cols-2 gap-2 xl:grid-cols-4">
         <Summary label="当前Claim门槛" value={`${overview.summary.claim_threshold_tao.toFixed(4)} TAO`} />
-        <Summary label="Root验证者" value={`${overview.summary.root_validator_count}个`} detail={`有basket：${overview.summary.basket_validator_count}个 · 已设置权重：${overview.summary.custom_weight_validator_count}个`} />
+        <Summary
+          label="Root验证者"
+          value={`${overview.summary.root_validator_count}个`}
+          detail={(
+            <>
+              <span>已设置权重：<strong className="font-semibold text-blue-300">{overview.summary.custom_weight_validator_count}个</strong></span>
+              <span className="mx-2 text-gray-600">|</span>
+              <span>验证者持仓篮子：<strong className="font-semibold text-emerald-300">{overview.summary.basket_validator_count}个</strong></span>
+              <span className="mx-2 text-gray-600">|</span>
+              <span>总持仓篮子：<strong className="font-semibold text-violet-300">{overview.summary.seeded_basket_validator_count}个</strong></span>
+            </>
+          )}
+        />
         <Summary label="前10名Root质押" value={percent(overview.summary.top10_root_stake_share)} detail={`其中已设置权重：${overview.summary.top10_custom_weight_count}个`} />
-        <Summary label="资金指向最集中" value={overview.summary.concentrated_subnets.map(item => `SN${item.netuid} ${percent(item.weighted_target_share)}`).join(' · ') || '--'} />
+        <Summary
+          label="资金指向最集中"
+          value={overview.summary.concentrated_subnets.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {overview.summary.concentrated_subnets.map((item, index) => (
+                <span key={item.netuid} className="whitespace-nowrap">
+                  {index > 0 && <span className="mr-3 text-gray-600">|</span>}
+                  <span className="font-normal text-gray-300">SN{item.netuid}</span>{' '}
+                  <strong className={index === 0 ? 'text-blue-300' : index === 1 ? 'text-emerald-300' : 'text-violet-300'}>{percent(item.weighted_target_share)}</strong>
+                </span>
+              ))}
+            </div>
+          ) : '--'}
+        />
       </section>
 
       <section className="min-h-0 flex-1 overflow-auto rounded-lg border border-white/10 bg-[#111722]">
@@ -157,18 +189,20 @@ export default function RootBasketFlowPanel() {
               <Fragment key={subnet.netuid}>
                 <tr onClick={() => selectSubnet(subnet.netuid)} className="group cursor-pointer hover:bg-white/[0.03]">
                   <td className="sticky left-0 z-10 w-14 bg-[#111722] px-2 py-3 text-center text-gray-500 group-hover:bg-[#151c28]">{index + 1}</td>
-                  <td className="px-3 py-3 text-center"><div className="font-semibold text-blue-400">SN{subnet.netuid}</div><div className="text-[11px] text-gray-500">{subnet.subnet_name || '--'}</div></td>
+                  <td className="px-3 py-3 text-center"><div className="font-semibold text-blue-400" title={subnet.subnet_name || undefined}>SN{subnet.netuid}</div></td>
                   <td className="px-3 py-3 text-center">{subnet.pointing_validator_count}</td>
-                  <td className="px-3 py-3 text-center">{subnet.top_validator_count}</td>
-                  <td className="px-3 py-3 text-center text-cyan-300">{percent(subnet.weighted_target_share)}</td>
-                  <td className="px-3 py-3 text-center">{alpha(subnet.basket_alpha)}</td>
-                  <td className="px-3 py-3 text-center">{signed(subnet.holding_change_1h_alpha)}</td>
-                  <td className="px-3 py-3 text-center">{signed(subnet.holding_change_24h_alpha)}</td>
-                  <td className="px-3 py-3 text-center">{subnet.estimated_buy_24h_tao === null ? '--' : `${subnet.estimated_buy_24h_tao.toFixed(2)}T`}</td>
-                  <td className="px-3 py-3 text-center">{percent(subnet.estimated_buy_pool_share)}</td>
-                  <td className={`px-3 py-3 text-center ${subnet.estimated_net_pressure_24h_tao !== null && subnet.estimated_net_pressure_24h_tao < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{subnet.estimated_net_pressure_24h_tao === null ? '--' : `${signed(subnet.estimated_net_pressure_24h_tao)}T`}</td>
-                  <td className="px-3 py-3 text-center">{percent(subnet.alpha_price_change_1h)}</td>
-                  <td className="px-3 py-3 text-center">{percent(subnet.alpha_price_change_24h)}</td>
+                   <td className="px-3 py-3 text-center">{subnet.holder_count}</td>
+                   <td className="px-3 py-3 text-center text-cyan-300">{percent(subnet.weighted_target_share)}</td>
+                   <td className="px-3 py-3 text-center">{tao(subnet.basket_value_tao)}</td>
+                   <td className="px-3 py-3 text-center text-cyan-300">{percent(subnet.root_capital_share)}</td>
+                   <td className="px-3 py-3 text-center">{percent(subnet.pool_share)}</td>
+                   <td className={`px-3 py-3 text-center ${directionColor(subnet.holding_change_1h_alpha)}`}>{signed(subnet.holding_change_1h_alpha)}</td>
+                   <td className={`px-3 py-3 text-center ${directionColor(subnet.holding_change_24h_alpha)}`}>{signed(subnet.holding_change_24h_alpha)}</td>
+                  <td className="px-3 py-3 text-center text-amber-300">{subnet.estimated_buy_24h_tao === null ? '--' : `${subnet.estimated_buy_24h_tao.toFixed(2)}T`}</td>
+                  <td className="px-3 py-3 text-center text-amber-300">{percent(subnet.estimated_buy_pool_share)}</td>
+                  <td className={`px-3 py-3 text-center ${directionColor(subnet.estimated_net_pressure_24h_tao)}`}>{subnet.estimated_net_pressure_24h_tao === null ? '--' : `${signed(subnet.estimated_net_pressure_24h_tao)}T`}</td>
+                  <td className={`px-3 py-3 text-center ${directionColor(subnet.alpha_price_change_1h)}`}>{percent(subnet.alpha_price_change_1h)}</td>
+                  <td className={`px-3 py-3 text-center ${directionColor(subnet.alpha_price_change_24h)}`}>{percent(subnet.alpha_price_change_24h)}</td>
                 </tr>
                 {detail?.netuid === subnet.netuid && (
                   <tr>
@@ -186,8 +220,8 @@ export default function RootBasketFlowPanel() {
   );
 }
 
-function Summary({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3"><div className="text-[11px] text-gray-500">{label}</div><div className="mt-1 truncate text-sm font-semibold text-white">{value}</div>{detail && <div className="mt-1 text-[11px] text-gray-500">{detail}</div>}</div>;
+function Summary({ label, value, detail }: { label: string; value: ReactNode; detail?: ReactNode }) {
+  return <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3"><div className="text-xs font-normal text-gray-400">{label}</div><div className="mt-1 text-sm font-semibold text-white">{value}</div>{detail && <div className="mt-1 text-xs font-normal text-gray-400">{detail}</div>}</div>;
 }
 
 function SubnetDetail({ detail, onClose }: { detail: RootBasketSubnetDetail; onClose: () => void }) {

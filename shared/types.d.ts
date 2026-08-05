@@ -110,9 +110,11 @@ export interface RootBasketSubnetRow {
   netuid: number;
   subnet_name: string;
   pointing_validator_count: number;
-  top_validator_count: number;
+  holder_count: number;
   weighted_target_share: number;
-  basket_alpha: number;
+  basket_value_tao: number;
+  root_capital_share: number;
+  pool_share: number | null;
   holding_change_1h_alpha: number | null;
   holding_change_24h_alpha: number | null;
   estimated_buy_24h_tao: number | null;
@@ -139,6 +141,7 @@ export interface RootBasketOverview {
     root_weight_setting_enabled: boolean;
     root_validator_count: number;
     basket_validator_count: number;
+    seeded_basket_validator_count: number;
     custom_weight_validator_count: number;
     top10_root_stake_share: number;
     top10_custom_weight_count: number;
