@@ -2,8 +2,39 @@ import { getSetting } from './settingsService.js';
 import { logger } from './logService.js';
 
 type TelegramAlertOptions = {
+  type: TelegramAlertType;
   parseMode?: 'Markdown' | null;
 };
+
+export const TELEGRAM_ALERT_TYPES = [
+  'subnet_emission_status',
+  'subnet_first_emission',
+  'subnet_burn_rate',
+  'root_weight_change',
+  'root_income_change'
+] as const;
+
+export type TelegramAlertType = typeof TELEGRAM_ALERT_TYPES[number];
+export type TelegramAlertChannel = 'primary' | 'backup';
+
+export function telegramAlertSettingKey(
+  type: TelegramAlertType,
+  channel: TelegramAlertChannel
+): string {
+  return `telegram_alert_${type}_${channel}`;
+}
+
+export async function getTelegramAlertSettings(): Promise<Record<string, boolean>> {
+  const entries = await Promise.all(
+    TELEGRAM_ALERT_TYPES.flatMap((type) => (
+      (['primary', 'backup'] as const).map(async (channel) => [
+        telegramAlertSettingKey(type, channel),
+        await getSetting(telegramAlertSettingKey(type, channel), 'true') === 'true'
+      ] as const)
+    ))
+  );
+  return Object.fromEntries(entries);
+}
 
 const TELEGRAM_REQUEST_TIMEOUT_MS = 10000;
 
@@ -23,17 +54,25 @@ async function fetchTelegram(url: string, init: RequestInit) {
   }
 }
 
-export async function sendTelegramAlert(message: string, options: TelegramAlertOptions = { parseMode: 'Markdown' }): Promise<void> {
+export async function sendTelegramAlert(message: string, options: TelegramAlertOptions): Promise<void> {
   const token = await getSetting('telegram_token');
   const chatId = await getSetting('telegram_chat_id');
   const tokenBackup = await getSetting('telegram_token_backup');
   const chatIdBackup = await getSetting('telegram_chat_id_backup');
+  const primaryEnabled = await getSetting(
+    telegramAlertSettingKey(options.type, 'primary'),
+    'true'
+  ) === 'true';
+  const backupEnabled = await getSetting(
+    telegramAlertSettingKey(options.type, 'backup'),
+    'true'
+  ) === 'true';
   
   const sends = [];
-  if (token && chatId) {
+  if (primaryEnabled && token && chatId) {
     sends.push(sendSingleTelegram(token, chatId, message, options));
   }
-  if (tokenBackup && chatIdBackup) {
+  if (backupEnabled && tokenBackup && chatIdBackup) {
     sends.push(sendSingleTelegram(tokenBackup, chatIdBackup, message, options));
   }
   

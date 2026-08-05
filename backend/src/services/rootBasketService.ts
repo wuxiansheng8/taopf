@@ -62,7 +62,7 @@ function detectWeightChanges(snapshot: RootBasketChainSnapshot): void {
           `权重：${(previous * 100).toFixed(2)}% → ${(item.share * 100).toFixed(2)}%`,
           `变化：${item.share >= previous ? '+' : ''}${((item.share - previous) * 100).toFixed(2)}个百分点`,
           `时间：${formatBeijingTime(new Date(snapshot.timestamp_ms))}`
-        ].join('\n'), { parseMode: null }).catch((error) => logRootBasketError(error));
+        ].join('\n'), { type: 'root_weight_change', parseMode: null }).catch((error) => logRootBasketError(error));
       }
       previousWeights.set(key, item.share);
     }
@@ -75,7 +75,7 @@ function detectWeightChanges(snapshot: RootBasketChainSnapshot): void {
       `权重：${(previous * 100).toFixed(2)}% → 0.00%`,
       `变化：-${(previous * 100).toFixed(2)}个百分点`,
       `时间：${formatBeijingTime(new Date(snapshot.timestamp_ms))}`
-    ].join('\n'), { parseMode: null }).catch((error) => logRootBasketError(error));
+    ].join('\n'), { type: 'root_weight_change', parseMode: null }).catch((error) => logRootBasketError(error));
     previousWeights.set(key, 0);
   }
 }
@@ -118,7 +118,7 @@ export async function recordRootBasketBlock(
         `预计24小时收益：${previousIncome.toFixed(2)}T → ${income24h.toFixed(2)}T`,
         `变化：${income24h >= previousIncome ? '+' : ''}${(income24h - previousIncome).toFixed(2)}T`,
         `时间：${formatBeijingTime(new Date(snapshot.timestamp_ms))}`
-      ].join('\n'), { parseMode: null }).catch((error) => logRootBasketError(error));
+      ].join('\n'), { type: 'root_income_change', parseMode: null }).catch((error) => logRootBasketError(error));
     }
     await db.run(
       'INSERT OR REPLACE INTO root_basket_snapshots (sampled_at_ms, block_number, netuid, basket_alpha, alpha_price, estimated_income_24h_tao) VALUES (?, ?, ?, ?, ?, ?)',

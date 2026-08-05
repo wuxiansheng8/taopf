@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { getSetting, setSetting } from '../services/settingsService.js';
-import { testTelegramBot } from '../services/telegramService.js';
+import {
+  getTelegramAlertSettings,
+  telegramAlertSettingKey,
+  TELEGRAM_ALERT_TYPES,
+  testTelegramBot
+} from '../services/telegramService.js';
 import { postFlashdutyEvent } from '../services/flashdutyService.js';
 import { testRpc, disconnectApi } from '../chain/api.js';
 import { verifyToken } from '../utils/jwt.js';
@@ -33,7 +38,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     const flashduty_enabled = await getSetting('flashduty_enabled', 'false');
     const flashduty_webhook = await getSetting('flashduty_webhook', '');
     const flashduty_cooldown = await getSetting('flashduty_cooldown', '300');
-    const burn_rate_monitor_enabled = await getSetting('burn_rate_monitor_enabled', 'false');
+    const telegram_alerts = await getTelegramAlertSettings();
     
     return {
       rpc_endpoints,
@@ -44,7 +49,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       flashduty_enabled: flashduty_enabled === 'true',
       flashduty_webhook,
       flashduty_cooldown,
-      burn_rate_monitor_enabled: burn_rate_monitor_enabled === 'true'
+      telegram_alerts
     };
   });
 
@@ -60,7 +65,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       flashduty_enabled,
       flashduty_webhook,
       flashduty_cooldown,
-      burn_rate_monitor_enabled
+      telegram_alerts
     } = request.body as any;
     
     const oldEndpoints = await getSetting('rpc_endpoints', 'wss://entrypoint-finney.opentensor.ai:443');
@@ -79,7 +84,12 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     await setSetting('flashduty_enabled', flashduty_enabled ? 'true' : 'false');
     await setSetting('flashduty_webhook', flashduty_webhook || '');
     await setSetting('flashduty_cooldown', String(cooldownNum));
-    await setSetting('burn_rate_monitor_enabled', burn_rate_monitor_enabled ? 'true' : 'false');
+    for (const type of TELEGRAM_ALERT_TYPES) {
+      for (const channel of ['primary', 'backup'] as const) {
+        const key = telegramAlertSettingKey(type, channel);
+        await setSetting(key, telegram_alerts?.[key] === false ? 'false' : 'true');
+      }
+    }
     
     if (normalizedRpcEndpoints !== normalizeRpcEndpoints(oldEndpoints)) {
       await disconnectApi();

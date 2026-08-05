@@ -28,7 +28,7 @@ export function parseBlockEvents(
           `• 区块高度: \`#${blockNumber}\``;
         
         logger.warn(`监测到子网排放状态变更: Subnet ${netuid} 被设置为 ${enabled ? '启用' : '禁用'}`);
-        sendTelegramAlert(alertMsg).catch(err => console.error('Failed to send Telegram alert:', err));
+        sendTelegramAlert(alertMsg, { type: 'subnet_emission_status' }).catch(err => console.error('Failed to send Telegram alert:', err));
         
         // 触发 FlashDuty 电话告警
         const fdTitle = `子网 ${netuid} 排放状态已${enabled ? '启用' : '禁用'}`;
@@ -52,7 +52,7 @@ export function parseBlockEvents(
         const alertMsg = `${beijingTime}\n[INFO]\n${logMsg}`;
         
         logger.info(logMsg);
-        sendTelegramAlert(alertMsg, { parseMode: null }).catch(err => console.error('Failed to send Telegram alert:', err));
+        sendTelegramAlert(alertMsg, { type: 'subnet_first_emission', parseMode: null }).catch(err => console.error('Failed to send Telegram alert:', err));
       } catch (err: any) {
         logger.error(`解析 FirstEmissionBlockNumberSet 事件出错: ${err.message}`);
       }

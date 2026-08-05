@@ -1,7 +1,6 @@
 import { SubnetBlockData } from '../../../shared/types.js';
 import { blockEmitter } from './emissionService.js';
 import { logger } from './logService.js';
-import { getSetting } from './settingsService.js';
 import { sendTelegramAlert } from './telegramService.js';
 
 type BlockData = {
@@ -20,7 +19,7 @@ const TELEGRAM_MESSAGE_LIMIT = 4000;
 const MIN_BURN_RATE_CHANGE_PERCENTAGE_POINTS = 5;
 
 let lastBurnRates = new Map<number, number>();
-let wasEnabled = false;
+let hasBaseline = false;
 let initialized = false;
 let blockQueue: Promise<void> = Promise.resolve();
 let sendQueue: Promise<void> = Promise.resolve();
@@ -99,7 +98,7 @@ function buildAlertMessages(data: BlockData, changes: BurnRateChange[]): string[
 function enqueueMessages(messages: string[]): void {
   for (const message of messages) {
     sendQueue = sendQueue
-      .then(() => sendTelegramAlert(message, { parseMode: null }))
+      .then(() => sendTelegramAlert(message, { type: 'subnet_burn_rate', parseMode: null }))
       .catch((err: any) => {
         logger.error(`燃烧率 Telegram 告警发送失败: ${err.message || String(err)}`);
       });
@@ -107,23 +106,12 @@ function enqueueMessages(messages: string[]): void {
 }
 
 async function handleBlock(data: BlockData): Promise<void> {
-  const enabled = await getSetting('burn_rate_monitor_enabled', 'false') === 'true';
-
-  if (!enabled) {
-    if (wasEnabled) {
-      lastBurnRates.clear();
-      wasEnabled = false;
-      logger.info('燃烧率监控已关闭，基线已清空');
-    }
-    return;
-  }
-
   const currentRates = buildCurrentRates(data.subnets);
 
-  if (!wasEnabled) {
+  if (!hasBaseline) {
     lastBurnRates = currentRates;
-    wasEnabled = true;
-    logger.info(`燃烧率监控已开启，已在区块 #${data.block_number} 建立 ${currentRates.size} 个子网的基线`);
+    hasBaseline = true;
+    logger.info(`已在区块 #${data.block_number} 建立 ${currentRates.size} 个子网的燃烧率基线`);
     return;
   }
 

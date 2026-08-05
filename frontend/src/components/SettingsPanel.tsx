@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react';
 import client from '../api/client.ts';
 
+const telegramAlertRows = [
+  ['subnet_emission_status', '子网排放状态变更'],
+  ['subnet_first_emission', '子网首次排放区块设置'],
+  ['subnet_burn_rate', '矿工燃烧率变化'],
+  ['root_weight_change', 'Root验证者权重变化'],
+  ['root_income_change', 'Root预计24小时收益变化']
+] as const;
+
+const telegramAlertChannels = ['primary', 'backup'] as const;
+type TelegramAlertKey = `${typeof telegramAlertRows[number][0]}_${typeof telegramAlertChannels[number]}`;
+type TelegramAlertSettings = Record<TelegramAlertKey, boolean>;
+
+const defaultTelegramAlertSettings = telegramAlertRows.reduce((settings, [type]) => {
+  settings[`${type}_primary` as TelegramAlertKey] = true;
+  settings[`${type}_backup` as TelegramAlertKey] = true;
+  return settings;
+}, {} as TelegramAlertSettings);
+
 export default function SettingsPanel() {
   const [rpcEndpoints, setRpcEndpoints] = useState('');
   const [telegramToken, setTelegramToken] = useState('');
@@ -10,7 +28,7 @@ export default function SettingsPanel() {
   const [flashdutyEnabled, setFlashdutyEnabled] = useState(false);
   const [flashdutyWebhook, setFlashdutyWebhook] = useState('');
   const [flashdutyCooldown, setFlashdutyCooldown] = useState('300');
-  const [burnRateMonitorEnabled, setBurnRateMonitorEnabled] = useState(false);
+  const [telegramAlerts, setTelegramAlerts] = useState<TelegramAlertSettings>(defaultTelegramAlertSettings);
 
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -49,7 +67,7 @@ export default function SettingsPanel() {
         setFlashdutyEnabled(res.data.flashduty_enabled || false);
         setFlashdutyWebhook(res.data.flashduty_webhook || '');
         setFlashdutyCooldown(res.data.flashduty_cooldown || '300');
-        setBurnRateMonitorEnabled(res.data.burn_rate_monitor_enabled || false);
+        setTelegramAlerts({ ...defaultTelegramAlertSettings, ...(res.data.telegram_alerts || {}) });
       } catch (err) {
         console.error('Failed to load settings:', err);
       }
@@ -72,7 +90,7 @@ export default function SettingsPanel() {
         flashduty_enabled: flashdutyEnabled,
         flashduty_webhook: flashdutyWebhook,
         flashduty_cooldown: flashdutyCooldown,
-        burn_rate_monitor_enabled: burnRateMonitorEnabled
+        telegram_alerts: telegramAlerts
       });
       setSaveStatus('✅ 配置保存成功！');
     } catch (err: any) {
@@ -207,6 +225,36 @@ export default function SettingsPanel() {
         <div className="glass-card p-6 space-y-6">
           <h3 className="text-sm font-bold text-white border-b border-white/5 pb-2">🤖 Telegram 机器人报警推送</h3>
           <div className="space-y-4">
+            <div className="border-b border-white/5 pb-4">
+              <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 text-xs text-gray-400">
+                <span>通知类型</span>
+                <span>主TG</span>
+                <span>备用TG</span>
+              </div>
+              <div className="mt-3 space-y-3">
+                {telegramAlertRows.map(([type, label]) => (
+                  <div key={type} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
+                    <span className="text-xs text-gray-300">{label}</span>
+                    {telegramAlertChannels.map((channel) => {
+                      const key = `${type}_${channel}` as TelegramAlertKey;
+                      return (
+                        <input
+                          key={key}
+                          type="checkbox"
+                          aria-label={`${label}${channel === 'primary' ? '主TG' : '备用TG'}`}
+                          className="h-4 w-4 cursor-pointer rounded border-white/10 bg-white/5 text-blue-500 focus:ring-0"
+                          checked={telegramAlerts[key]}
+                          onChange={(event) => setTelegramAlerts((current) => ({
+                            ...current,
+                            [key]: event.target.checked
+                          }))}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="space-y-1">
               <label className="text-xs text-gray-400">Telegram Bot Token</label>
               <input
@@ -277,25 +325,6 @@ export default function SettingsPanel() {
               )}
             </div>
 
-            <div className="border-t border-white/5 pt-4 flex items-center justify-between">
-              <span className="text-xs text-gray-300 font-semibold select-none">燃烧率监控</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={burnRateMonitorEnabled}
-                aria-label="燃烧率监控"
-                onClick={() => setBurnRateMonitorEnabled((enabled) => !enabled)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center cursor-pointer rounded-full border border-white/10 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                  burnRateMonitorEnabled ? 'bg-blue-600' : 'bg-white/10'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                    burnRateMonitorEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
           </div>
         </div>
       </div>
