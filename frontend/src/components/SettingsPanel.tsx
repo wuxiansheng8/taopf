@@ -10,12 +10,19 @@ const telegramAlertRows = [
 ] as const;
 
 const telegramAlertChannels = ['primary', 'backup'] as const;
-type TelegramAlertKey = `${typeof telegramAlertRows[number][0]}_${typeof telegramAlertChannels[number]}`;
+type TelegramAlertType = typeof telegramAlertRows[number][0];
+type TelegramAlertChannel = typeof telegramAlertChannels[number];
+type TelegramAlertKey = `telegram_alert_${TelegramAlertType}_${TelegramAlertChannel}`;
 type TelegramAlertSettings = Record<TelegramAlertKey, boolean>;
 
+const telegramAlertSettingKey = (
+  type: TelegramAlertType,
+  channel: TelegramAlertChannel
+): TelegramAlertKey => `telegram_alert_${type}_${channel}`;
+
 const defaultTelegramAlertSettings = telegramAlertRows.reduce((settings, [type]) => {
-  settings[`${type}_primary` as TelegramAlertKey] = true;
-  settings[`${type}_backup` as TelegramAlertKey] = true;
+  settings[telegramAlertSettingKey(type, 'primary')] = true;
+  settings[telegramAlertSettingKey(type, 'backup')] = true;
   return settings;
 }, {} as TelegramAlertSettings);
 
@@ -236,7 +243,7 @@ export default function SettingsPanel() {
                   <div key={type} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
                     <span className="text-xs text-gray-300">{label}</span>
                     {telegramAlertChannels.map((channel) => {
-                      const key = `${type}_${channel}` as TelegramAlertKey;
+                      const key = telegramAlertSettingKey(type, channel);
                       return (
                         <input
                           key={key}
